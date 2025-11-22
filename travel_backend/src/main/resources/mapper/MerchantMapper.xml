@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  File: .\src\main\resources\mapper\MerchantMapper.xml
+  Description: Auto-generated file header comment.
+  Created: 2025-10-17
+-->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lq.common.mapper.MerchantMapper">
+
+    <!-- 搜索商家 -->
+    <select id="searchMerchants" resultType="com.lq.travel.model.entity.Merchant">
+        SELECT * FROM merchant
+        WHERE status = 1 AND is_delete = 0
+        <if test="name != null and name != ''">
+            AND name LIKE CONCAT('%', #{name}, '%')
+        </if>
+        <if test="type != null">
+            AND type = #{type}
+        </if>
+        ORDER BY rating DESC, create_time DESC
+    </select>
+
+    <!-- 获取推荐商家 -->
+    <select id="selectRecommendedMerchants" resultType="com.lq.travel.model.entity.Merchant">
+        SELECT * FROM merchant
+        WHERE status = 1 AND is_delete = 0
+        ORDER BY rating DESC, heat_value DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 获取商家列表 -->
+    <select id="selectMerchantList" resultType="com.lq.travel.model.entity.Merchant">
+        SELECT * FROM merchant
+        WHERE status = 1 AND is_delete = 0
+        ORDER BY create_time DESC
+    </select>
+
+</mapper>

@@ -1,0 +1,54 @@
+import { ref } from 'vue'
+import { defineStore } from 'pinia'
+import { getLoginUser } from '@/api/userController'
+
+// ????????????????????????????
+export const useLoginUserStore = defineStore('loginUser', () => {
+  const loginUser = ref<API.LoginUserVO>({
+    userName: '???',
+  })
+
+  /**
+   * ??????????
+   */
+  async function fetchLoginUser() {
+    try {
+      console.log('??????????')
+      const res = await getLoginUser()
+      console.log('????????:', res)
+      console.log('????:', res.data)
+      console.log('??code:', res.data?.code)
+      console.log('??data:', res.data?.data)
+
+      // ?????code??0 ? 200 ??????
+      const isSuccess = res.data.code === 0 || res.data.code === 200
+
+      if (isSuccess && res.data.data) {
+        loginUser.value = res.data.data
+        console.log('???????', loginUser.value)
+        console.log('??ID:', loginUser.value.id)
+        console.log('???', loginUser.value.userName)
+      } else {
+        console.log('???????? - code:', res.data?.code, 'message:', res.data?.message || '????')
+        loginUser.value = {
+          userName: '???',
+        }
+      }
+    } catch (error: any) {
+      console.error('???????????', error)
+      // ??????????????????
+      loginUser.value = {
+        userName: '???',
+      }
+    }
+  }
+
+  /**
+   * ??????
+   */
+  function setLoginUser(newLoginUser: API.LoginUserVO) {
+    loginUser.value = newLoginUser
+  }
+
+  return { loginUser, fetchLoginUser, setLoginUser }
+})

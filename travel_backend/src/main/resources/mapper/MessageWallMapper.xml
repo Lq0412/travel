@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lq.common.mapper.MessageWallMapper">
+
+    <select id="selectMessageWallPage" resultType="com.lq.travel.model.entity.MessageWall">
+        SELECT * FROM message_wall
+        WHERE is_delete = 0
+        <if test="params.scenicSpotId != null">
+            AND scenic_spot_id = #{params.scenicSpotId}
+        </if>
+        <if test="params.userId != null">
+            AND user_id = #{params.userId}
+        </if>
+        <if test="params.messageType != null">
+            AND message_type = #{params.messageType}
+        </if>
+        <if test="params.status != null">
+            AND status = #{params.status}
+        </if>
+        <if test="params.isBarrage != null">
+            AND is_barrage = #{params.isBarrage}
+        </if>
+        <if test="params.keyword != null and params.keyword != ''">
+            AND content LIKE CONCAT('%', #{params.keyword}, '%')
+        </if>
+        ORDER BY create_time DESC
+    </select>
+
+    <update id="updateLikes">
+        UPDATE message_wall
+        SET likes = likes + #{increment}
+        WHERE id = #{messageId} AND is_delete = 0
+    </update>
+
+    <select id="countApprovedMessagesByScenicSpotId" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM message_wall
+        WHERE scenic_spot_id = #{scenicSpotId}
+        AND is_delete = 0
+        AND status = 1
+    </select>
+
+</mapper>

@@ -1,0 +1,16 @@
+# 构建输出
+target/
+build/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### 敏感配置文件 ###
+/src/main/java/com/lq/travel/AI/doc/
+/src/main/resources/application-local.yml

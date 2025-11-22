@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  File: .\src\main\resources\mapper\AIConversationMapper.xml
+  Description: Auto-generated file header comment.
+  Created: 2025-10-17
+-->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lq.common.AI.core.mapper.AIConversationMapper">
+
+    <!-- 获取用户的对话列表（分页） -->
+    <select id="selectUserConversations" resultType="com.lq.travel.AI.core.model.entity.AIConversation">
+        SELECT id, user_id, title, provider, model, status, create_time, update_time, is_delete
+        FROM ai_conversation
+        WHERE user_id = #{userId} AND is_delete = 0
+        ORDER BY update_time DESC
+        LIMIT #{offset}, #{limit}
+    </select>
+
+    <!-- 统计用户的对话数量 -->
+    <select id="countUserConversations" resultType="int">
+        SELECT COUNT(*)
+        FROM ai_conversation
+        WHERE user_id = #{userId} AND is_delete = 0
+    </select>
+
+    <!-- 软删除对话 -->
+    <update id="softDeleteConversation">
+        UPDATE ai_conversation
+        SET is_delete = 1, update_time = NOW()
+        WHERE id = #{conversationId} AND is_delete = 0
+    </update>
+
+</mapper>

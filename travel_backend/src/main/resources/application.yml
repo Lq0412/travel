@@ -1,0 +1,72 @@
+  # File: .\src\main\resources\application.yml
+# Description: Auto-generated file header comment.
+# Created: 2025-10-17
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+    session:
+      cookie:
+        max-age: 2592000   # 30 天
+
+spring:
+  profiles:
+    active: local
+  application:
+    name: travel_backend
+  session:                 # 使用 redis 存储 session
+    store-type: redis
+    timeout: 2592000
+  servlet:
+    multipart:             # 文件上传配置
+      max-file-size: 10MB
+  
+# 数字人服务配置
+digital-human:
+  python-service-url: http://localhost:8888  # Python数字人服务地址
+
+# AI模块配置
+ai:
+  cache:
+    caffeine:
+      max-size: 10000              # Caffeine缓存最大条目数
+      expire-minutes: 30           # Caffeine缓存过期时间（分钟）
+    redis:
+      ttl-minutes: 60              # Redis正常缓存TTL（分钟）
+      empty-ttl-seconds: 120       # Redis空值缓存TTL（秒）
+      error-ttl-seconds: 60        # Redis错误缓存TTL（秒）
+    lock:
+      ttl-seconds: 30              # 分布式锁TTL（秒）
+      wait-timeout-seconds: 5      # 锁等待超时时间（秒）
+  quota:
+    daily-limit: 10000             # 每日默认配额（Token数量）
+  rate-limit:
+    chat:
+      limit-per-period: 10         # 聊天接口限流：每周期请求数
+      period-seconds: 60           # 限流周期（秒）
+    stream:
+      limit-per-period: 5          # 流式接口限流
+      period-seconds: 60
+    agent:
+      limit-per-period: 3          # 代理接口限流
+      period-seconds: 60
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 开发环境 SQL 日志
+  global-config:
+    db-config:
+      column-underline: true
+      logic-delete-field: isDelete
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath:/mapper/*.xml
+
+# Knife4j API文档配置
+knife4j:
+  enable: false
+  production: false                  # 建议生产环境改为 true，屏蔽文档
+  setting:
+    language: zh_CN                  # 中文界面
