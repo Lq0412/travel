@@ -206,6 +206,8 @@ const imageUrl = ref<string | null>(null)
 const errorMessage = ref('')
 let timer: any = null
 let pollCount = 0
+// 防止重复弹出成功提示
+const successNotified = ref(false)
 
 // 计算属性
 const hasUploading = computed(() => photos.value.some(p => p.uploading))
@@ -427,6 +429,7 @@ async function startGenerate() {
 
   starting.value = true
   errorMessage.value = ''
+  successNotified.value = false
 
   try {
     // 如果有新增图片，则先进行关联；否则用已有图片直接生成
@@ -522,7 +525,10 @@ function poll() {
           // 成功时清空错误并停止轮询
           errorMessage.value = ''
           clearInterval(timer)
-          message.success('回忆图生成成功！')
+          if (!successNotified.value) {
+            successNotified.value = true
+            message.success('回忆图生成成功！')
+          }
         } else if (status.value === 'failed') {
           clearInterval(timer)
           message.error(errorMessage.value || '回忆图生成失败')

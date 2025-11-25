@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
@@ -56,6 +56,7 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- Spring AI BOM: 对齐 Spring AI 相关模块的版本 -->
             <dependency>
                 <groupId>org.springframework.ai</groupId>
                 <artifactId>spring-ai-bom</artifactId>
@@ -63,12 +64,13 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            <!-- OkHttp版本管理 -->
+            <!-- 锁定 OkHttp 客户端版本，供下方依赖复用 -->
             <dependency>
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp</artifactId>
                 <version>4.12.0</version>
             </dependency>
+            <!-- 锁定 Okio 版本，与 OkHttp 版本配套 -->
             <dependency>
                 <groupId>com.squareup.okio</groupId>
                 <artifactId>okio</artifactId>
@@ -78,110 +80,123 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- Web 栈：Spring MVC + 内嵌容器 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- 消息队列：RabbitMQ 支持 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        <!-- Lombok 编译期注解，生成样板代码（运行时不需要） -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <version>1.18.38</version>
             <scope>provided</scope>
         </dependency>
+        <!-- 测试套件：JUnit/AssertJ/Mockito 等 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!--mybatis-plus-->
+        <!-- 数据访问：MyBatis-Plus Starter -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
             <version>3.5.8</version>
         </dependency>
-        <!--MySQL-->
+        <!-- MySQL JDBC 驱动（运行时加载） -->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <!--Redis-->
+        <!-- Redis 客户端与模板封装 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
+        <!-- 会话共享：将 Session 存入 Redis -->
         <dependency>
             <groupId>org.springframework.session</groupId>
             <artifactId>spring-session-data-redis</artifactId>
         </dependency>
-        <!--caffeine-->
+        <!-- 本地内存缓存：Caffeine -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
             <version>2.9.3</version>
         </dependency>
-        <!--Resilience4j限流-->
+        <!-- 限流组件：Resilience4j RateLimiter -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-ratelimiter</artifactId>
             <version>2.1.0</version>
         </dependency>
+        <!-- Resilience4j 与 Spring Boot 集成 Starter -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
             <version>2.1.0</version>
         </dependency>
-        <!--hutool-->
+        <!-- Hutool 常用工具集 -->
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
             <version>5.8.38</version>
         </dependency>
-        <!--jsoup-->
+        <!-- HTML 解析与爬取：Jsoup -->
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
             <version>1.21.2</version>
         </dependency>
-        <!--okhttp - 使用稳定版本 -->
+        <!-- HTTP 客户端：OkHttp，版本与上方 BOM 保持一致 -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
             <version>4.12.0</version>
         </dependency>
-        <!--okio - 匹配okhttp版本 -->
+        <!-- OkHttp 配套的 IO 库：Okio -->
         <dependency>
             <groupId>com.squareup.okio</groupId>
             <artifactId>okio</artifactId>
             <version>3.6.0</version>
         </dependency>
-        <!--knife4j-->
+        <!-- 接口文档：Knife4j OpenAPI3 Starter -->
         <dependency>
             <groupId>com.github.xingfudeshi</groupId>
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
             <version>4.6.0</version>
         </dependency>
-        <!--腾讯云cos-->
+        <!-- 对象存储：腾讯云 COS SDK -->
         <dependency>
             <groupId>com.qcloud</groupId>
             <artifactId>cos_api</artifactId>
             <version>5.6.227</version>
         </dependency>
+        <!-- AOP 织入支持（事务、切面等） -->
         <dependency>
             <groupId>org.aspectj</groupId>
             <artifactId>aspectjweaver</artifactId>
         </dependency>
+        <!-- AspectJ 运行时 -->
         <dependency>
             <groupId>org.aspectj</groupId>
             <artifactId>aspectjrt</artifactId>
         </dependency>
-        <!-- Spring AI Core -->
+        <!-- Spring AI 核心能力 -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-core</artifactId>
             <version>${spring-ai.version}</version>
         </dependency>
-        <!--阿里云通义千问-->
+
+        <!-- 阿里云 DashScope/通义 API 客户端，排除多余日志与 HTTP 依赖 -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>dashscope-sdk-java</artifactId>
@@ -191,7 +206,7 @@
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-simple</artifactId>
                 </exclusion>
-                <!-- 排除可能冲突的OkHttp版本 -->
+
                 <exclusion>
                     <groupId>com.squareup.okhttp3</groupId>
                     <artifactId>okhttp</artifactId>
@@ -202,18 +217,25 @@
                 </exclusion>
             </exclusions>
         </dependency>
+        <!-- Bean Validation 规范接口 -->
         <dependency>
             <groupId>jakarta.validation</groupId>
             <artifactId>jakarta.validation-api</artifactId>
             <version>3.0.2</version>
         </dependency>
-        <!-- OpenAI Java SDK 已移除，现在使用通义千问原生SDK -->
+        <!-- Jackson 对 Java 时间类型 (JSR310) 的序列化支持 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
 
+        <!-- Servlet API 编译期依赖，运行时由容器提供 -->
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- 显式锁定 Spring Beans 版本 -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-beans</artifactId>
@@ -255,3 +277,5 @@
     </build>
 
 </project>
+
+

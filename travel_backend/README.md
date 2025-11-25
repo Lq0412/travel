@@ -2,6 +2,13 @@
 
 本目录是「智能 AI 旅游推荐平台」的后端服务，基于 Spring Boot 3.5.5 + Java 21 构建，提供 AI 行程规划、行程管理、回忆图生成、数字人对话、电商与社区等 REST API，供前端 `travel_frontend` 调用。
 
+## MQ 改造进展
+- 回忆图链路已完成 MQ 异步化：本地 taskId + 远端 remoteTaskId，消费者/定时补偿会回写 MemoryCard 与 AiTask，前端轮询正常。
+- 相关文档：
+  - 改造计划：`docs/rabbitmq-plan.md`
+  - 实现与学习笔记：`docs/rabbitmq-notes.md`
+  - 后续规划：`docs/next-steps.md`
+
 ## 功能概览
 
 - **AI 智能助手**
@@ -176,4 +183,3 @@ mvn spring-boot:run
 
 - 作者：**Lq0412**
 - 联系方式：`15919508513@163.com`
-

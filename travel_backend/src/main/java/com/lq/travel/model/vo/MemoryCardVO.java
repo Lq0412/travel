@@ -17,6 +17,7 @@ public class MemoryCardVO implements Serializable {
     private String templateName;
     private String imageUrl;
     private String taskId;
+    private String remoteTaskId;
     private String status;
     private String errorMessage;
     private Integer retryCount;

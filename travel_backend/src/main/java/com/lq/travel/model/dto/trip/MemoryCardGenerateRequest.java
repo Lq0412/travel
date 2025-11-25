@@ -10,22 +10,36 @@ import java.util.List;
  */
 @Data
 public class MemoryCardGenerateRequest implements Serializable {
-    
+
     /**
      * 行程ID
      */
     private Long tripId;
-    
+
     /**
-     * 照片URL列表（3-6张）
+     * 照片 URL 列表（3-6 张）
      */
     private List<String> photoUrls;
-    
+
     /**
-     * 模板名称（MVP阶段固定为"default"）
+     * 模板名称（默认 "default"）
      */
     private String templateName;
-    
+
+    /**
+     * 生成尺寸（如 1328x1328），可选
+     */
+    private String size;
+
+    /**
+     * 风格，可选（如 fresh）
+     */
+    private String style;
+
+    /**
+     * 质量，可选（如 standard）
+     */
+    private String quality;
+
     private static final long serialVersionUID = 1L;
 }
-

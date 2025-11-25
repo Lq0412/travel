@@ -26,5 +26,25 @@ public interface MemoryCardService extends IService<MemoryCard> {
      * 根据行程ID获取回忆图
      */
     MemoryCardVO getMemoryCardByTripId(Long tripId, Long userId);
+
+    /**
+     * 上传图片到 COS（用于消费者侧）
+     */
+    com.lq.travel.model.dto.file.UploadPictureResult uploadToCos(String imageUrl, String pathPrefix);
+
+    /**
+     * 消费者侧：标记回忆图处理中并记录远端 taskId
+     */
+    void updateMemoryCardProcessing(Long tripId, String remoteTaskId);
+
+    /**
+     * 消费者侧：标记回忆图生成成功并写历史
+     */
+    void updateMemoryCardSuccess(Long tripId, String cosUrl, String remoteTaskId);
+
+    /**
+     * 消费者侧：标记回忆图生成失败
+     */
+    void updateMemoryCardFailed(Long tripId, String errorMessage);
 }
 

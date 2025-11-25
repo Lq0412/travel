@@ -1,61 +1,73 @@
-  # File: .\src\main\resources\application.yml
-# Description: Auto-generated file header comment.
-# Created: 2025-10-17
-
-server:
+﻿server:
   port: 8080
   servlet:
     context-path: /api
     session:
       cookie:
-        max-age: 2592000   # 30 天
+        max-age: 2592000  # 30 天
 
 spring:
   profiles:
-    active: local
+    active: local  # 本地开发环境
   application:
     name: travel_backend
-  session:                 # 使用 redis 存储 session
+  session:  # 使用 redis 存储 session
     store-type: redis
     timeout: 2592000
   servlet:
-    multipart:             # 文件上传配置
+    multipart:  # 文件上传配置
       max-file-size: 10MB
-  
-# 数字人服务配置
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}  # RabbitMQ host
+    port: ${RABBITMQ_PORT:5672}  # RabbitMQ port
+    username: ${RABBITMQ_USERNAME:guest}  # RabbitMQ username
+    password: ${RABBITMQ_PASSWORD:guest}  # RabbitMQ password
+    virtual-host: ${RABBITMQ_VHOST:/}  # RabbitMQ virtual host
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        prefetch: 5
+
 digital-human:
   python-service-url: http://localhost:8888  # Python数字人服务地址
 
-# AI模块配置
 ai:
   cache:
     caffeine:
-      max-size: 10000              # Caffeine缓存最大条目数
-      expire-minutes: 30           # Caffeine缓存过期时间（分钟）
+      max-size: 10000  # Caffeine缓存最大条目数
+      expire-minutes: 30  # Caffeine缓存过期时间（分钟）
     redis:
-      ttl-minutes: 60              # Redis正常缓存TTL（分钟）
-      empty-ttl-seconds: 120       # Redis空值缓存TTL（秒）
-      error-ttl-seconds: 60        # Redis错误缓存TTL（秒）
+      ttl-minutes: 60  # Redis正常缓存TTL（分钟）
+      empty-ttl-seconds: 120  # Redis空值缓存TTL（秒）
+      error-ttl-seconds: 60  # Redis错误缓存TTL（秒）
     lock:
-      ttl-seconds: 30              # 分布式锁TTL（秒）
-      wait-timeout-seconds: 5      # 锁等待超时时间（秒）
+      ttl-seconds: 30  # 分布式锁TTL（秒）
+      wait-timeout-seconds: 5  # 等待锁超时时间（秒）
   quota:
-    daily-limit: 10000             # 每日默认配额（Token数量）
+    daily-limit: 10000  # 每日默认配额（tokens）
   rate-limit:
     chat:
-      limit-per-period: 10         # 聊天接口限流：每周期请求数
-      period-seconds: 60           # 限流周期（秒）
+      limit-per-period: 10  # 聊天接口限流：每周期请求数
+      period-seconds: 60  # 限流周期（秒）
     stream:
-      limit-per-period: 5          # 流式接口限流
+      limit-per-period: 5  # 流式接口限流
       period-seconds: 60
     agent:
-      limit-per-period: 3          # 代理接口限流
+      limit-per-period: 3  # Agent接口限流
       period-seconds: 60
+  mq:
+    enabled: true  # MQ 改造开关，必要时可关闭回退同步
+    retry:
+      max-retry: 5
+      backoff-ms: 300
+    memory-card-enabled: true  # 回忆图是否走 MQ 异步（默认关闭，保持兼容）
+    reconcile-interval-ms: 60000  # AiTask 补偿轮询间隔（ms）
 
 mybatis-plus:
   configuration:
-    map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 开发环境 SQL 日志
+    map-underscore-to-camel-case: true  # 开发环境打印SQL日志
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   global-config:
     db-config:
       column-underline: true
@@ -64,9 +76,8 @@ mybatis-plus:
       logic-not-delete-value: 0
   mapper-locations: classpath:/mapper/*.xml
 
-# Knife4j API文档配置
 knife4j:
   enable: false
-  production: false                  # 建议生产环境改为 true，屏蔽文档
+  production: false  # 建议生产环境改为 true 关闭文档
   setting:
-    language: zh_CN                  # 中文界面
+    language: zh_CN  # 中文界面

@@ -775,6 +775,7 @@ CREATE TABLE `memory_card`  (
   `template_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'default' COMMENT '模板名称（固定模板，MVP阶段只有一个）',
   `image_url` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '生成结果URL',
   `task_id` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '生成任务ID（用于异步任务轮询）',
+  `remote_task_id` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '远端图像任务ID（MQ异步时用于查询 DashScope 任务）',
   `status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'pending' COMMENT '生成状态：pending（待生成）、processing（生成中）、success（成功）、failed（失败）',
   `error_message` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '错误信息（如果生成失败）',
   `retry_count` int NOT NULL DEFAULT 0 COMMENT '重试次数',
@@ -785,6 +786,7 @@ CREATE TABLE `memory_card`  (
   INDEX `idx_trip_id`(`trip_id` ASC) USING BTREE,
   INDEX `idx_user_id`(`user_id` ASC) USING BTREE,
   INDEX `idx_task_id`(`task_id` ASC) USING BTREE,
+  INDEX `idx_remote_task_id`(`remote_task_id` ASC) USING BTREE,
   INDEX `idx_status`(`status` ASC) USING BTREE,
   INDEX `idx_is_delete`(`is_delete` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 3 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '回忆图表' ROW_FORMAT = DYNAMIC;
@@ -792,8 +794,8 @@ CREATE TABLE `memory_card`  (
 -- ----------------------------
 -- Records of memory_card
 -- ----------------------------
-INSERT INTO `memory_card` VALUES (1, 1, 1971813431033851906, 'default', 'https://qq-1375584552.cos.ap-guangzhou.myqcloud.com/memory-card/1/2025-11-11_4NKiQGM1fPm4TzRK.webp', 'b5cedd53-8303-4ee4-a312-868229ab7ab0', 'success', NULL, 0, '2025-11-11 20:01:40', '2025-11-11 20:01:40', 0);
-INSERT INTO `memory_card` VALUES (2, 6, 1971813431033851906, 'default', 'https://qq-1375584552.cos.ap-guangzhou.myqcloud.com/memory-card/6/2025-11-20_38e7U43sDFAl3WF4.webp', 'd972e830-3250-4b47-8eb9-956dcc12fd06', 'success', NULL, 0, '2025-11-20 19:58:06', '2025-11-20 19:58:06', 0);
+INSERT INTO `memory_card` VALUES (1, 1, 1971813431033851906, 'default', 'https://qq-1375584552.cos.ap-guangzhou.myqcloud.com/memory-card/1/2025-11-11_4NKiQGM1fPm4TzRK.webp', 'b5cedd53-8303-4ee4-a312-868229ab7ab0', NULL, 'success', NULL, 0, '2025-11-11 20:01:40', '2025-11-11 20:01:40', 0);
+INSERT INTO `memory_card` VALUES (2, 6, 1971813431033851906, 'default', 'https://qq-1375584552.cos.ap-guangzhou.myqcloud.com/memory-card/6/2025-11-20_38e7U43sDFAl3WF4.webp', 'd972e830-3250-4b47-8eb9-956dcc12fd06', NULL, 'success', NULL, 0, '2025-11-20 19:58:06', '2025-11-20 19:58:06', 0);
 
 -- ----------------------------
 -- Table structure for memory_card_history

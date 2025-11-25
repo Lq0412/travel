@@ -43,6 +43,11 @@ public class MemoryCard implements Serializable {
      * 生成任务ID（用于异步任务轮询）
      */
     private String taskId;
+
+    /**
+     * 远端图像生成任务ID（异步轮询需要实际执行方的任务号）
+     */
+    private String remoteTaskId;
     
     /**
      * 生成状态：pending（待生成）、processing（生成中）、success（成功）、failed（失败）
