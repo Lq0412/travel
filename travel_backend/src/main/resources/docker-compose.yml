@@ -22,6 +22,24 @@ services:
     networks:
       - my-network
 
+  mysql:
+    image: mysql:8
+    container_name: my-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456 # 设置 MySQL 根密码
+      MYSQL_DATABASE: travel  # 创建数据库
+    ports:
+      - "3306:3306"  # 映射容器内的 MySQL 端口到主机
+    volumes:
+      - mysql-data:/var/lib/mysql  # 持久化 MySQL 数据
+    restart: always
+    networks:
+      - my-network
+
 networks:
   my-network:
     driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local
