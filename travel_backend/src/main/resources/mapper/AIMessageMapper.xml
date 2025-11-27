@@ -6,7 +6,7 @@
 -->
 
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.lq.common.AI.core.mapper.AIMessageMapper">
+<mapper namespace="com.lq.travel.AI.core.mapper.AIMessageMapper">
 
     <!-- 获取对话的消息列表（按时间排序） -->
     <select id="selectConversationMessages" resultType="com.lq.travel.AI.core.model.entity.AIMessage">

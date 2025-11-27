@@ -9,7 +9,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
-<mapper namespace="com.lq.common.mapper.PictureMapper">
+<mapper namespace="com.lq.travel.mapper.PictureMapper">
 
     <resultMap id="BaseResultMap" type="com.lq.travel.model.entity.Picture">
         <id property="id" column="id"/>

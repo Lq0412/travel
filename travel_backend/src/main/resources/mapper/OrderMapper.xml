@@ -6,7 +6,7 @@
 -->
 
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.lq.common.mapper.OrderMapper">
+<mapper namespace="com.lq.travel.mapper.OrderMapper">
 
     <resultMap id="OrderResult" type="com.lq.travel.model.entity.Order">
         <id property="id" column="id"/>

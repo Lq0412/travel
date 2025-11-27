@@ -6,7 +6,7 @@
 -->
 
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.lq.common.mapper.MerchantMapper">
+<mapper namespace="com.lq.travel.mapper.MerchantMapper">
 
     <!-- 搜索商家 -->
     <select id="searchMerchants" resultType="com.lq.travel.model.entity.Merchant">
