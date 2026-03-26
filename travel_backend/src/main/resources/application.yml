@@ -81,3 +81,8 @@ knife4j:
   production: false  # 建议生产环境改为 true 关闭文档
   setting:
     language: zh_CN  # 中文界面
+
+pexels:
+  base-url: https://api.pexels.com/v1
+  cache-minutes: 30
+  api-key: ${PEXELS_API_KEY:}

@@ -1,6 +1,6 @@
 ﻿<template>
-  <div class="planner-page">
-    <div class="page-header">
+  <div class="planner-page" :class="{ embedded }">
+    <div v-if="!embedded" class="page-header">
       <h1 class="page-title">AI 行程规划</h1>
       <p class="page-subtitle">输入您的旅行需求，AI 将为您生成个性化行程方案</p>
     </div>
@@ -267,6 +267,10 @@ import { ref, watch } from 'vue'
 import { generateTrip, saveTrip } from '@/api/tripController'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false
+})
 
 const router = useRouter()
 const loading = ref(false)
@@ -635,6 +639,12 @@ function syncEndDate() {
   @media (max-width: 768px) {
     padding: 24px 16px;
   }
+
+  &.embedded {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 .page-header {
@@ -788,5 +798,3 @@ function syncEndDate() {
   justify-content: flex-end;
 }
 </style>
-
-

@@ -2,52 +2,32 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getLoginUser } from '@/api/userController'
 
-// ????????????????????????????
-export const useLoginUserStore = defineStore('loginUser', () => {
-  const loginUser = ref<API.LoginUserVO>({
-    userName: '???',
-  })
+const guestUser: API.LoginUserVO = {
+  id: undefined,
+  userName: '未登录',
+  userAvatar: '',
+  userAccount: '',
+  userRole: undefined as any,
+}
 
-  /**
-   * ??????????
-   */
+export const useLoginUserStore = defineStore('loginUser', () => {
+  const loginUser = ref<API.LoginUserVO>({ ...guestUser })
+
   async function fetchLoginUser() {
     try {
-      console.log('??????????')
       const res = await getLoginUser()
-      console.log('????????:', res)
-      console.log('????:', res.data)
-      console.log('??code:', res.data?.code)
-      console.log('??data:', res.data?.data)
-
-      // ?????code??0 ? 200 ??????
       const isSuccess = res.data.code === 0 || res.data.code === 200
-
-      if (isSuccess && res.data.data) {
-        loginUser.value = res.data.data
-        console.log('???????', loginUser.value)
-        console.log('??ID:', loginUser.value.id)
-        console.log('???', loginUser.value.userName)
-      } else {
-        console.log('???????? - code:', res.data?.code, 'message:', res.data?.message || '????')
-        loginUser.value = {
-          userName: '???',
-        }
-      }
-    } catch (error: any) {
-      console.error('???????????', error)
-      // ??????????????????
-      loginUser.value = {
-        userName: '???',
-      }
+      loginUser.value = isSuccess && res.data.data ? res.data.data : { ...guestUser }
+    } catch {
+      loginUser.value = { ...guestUser }
     }
   }
 
-  /**
-   * ??????
-   */
   function setLoginUser(newLoginUser: API.LoginUserVO) {
-    loginUser.value = newLoginUser
+    loginUser.value = {
+      ...guestUser,
+      ...newLoginUser,
+    }
   }
 
   return { loginUser, fetchLoginUser, setLoginUser }

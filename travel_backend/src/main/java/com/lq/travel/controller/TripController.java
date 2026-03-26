@@ -3,12 +3,16 @@ package com.lq.travel.controller;
 import com.lq.travel.AI.core.annotation.ApiRateLimit;
 import com.lq.travel.annotation.AuthCheck;
 import com.lq.travel.common.ResponseUtils;
+import com.lq.travel.exception.BusinessException;
+import com.lq.travel.exception.ErrorCode;
 import com.lq.travel.model.dto.trip.ForumPublishRequest;
 import com.lq.travel.model.dto.trip.TripGenerateRequest;
 import com.lq.travel.model.dto.trip.TripGenerateResponse;
 import com.lq.travel.model.dto.trip.TripSaveRequest;
+import com.lq.travel.model.entity.Category;
 import com.lq.travel.model.entity.User;
 import com.lq.travel.model.vo.TripVO;
+import com.lq.travel.service.CategoryService;
 import com.lq.travel.service.MemoryCardService;
 import com.lq.travel.service.PostService;
 import com.lq.travel.service.TripService;
@@ -39,6 +43,9 @@ public class TripController {
     
     @Resource
     private PostService postService;
+
+    @Resource
+    private CategoryService categoryService;
     
     /**
      * AI生成行程方案
@@ -155,7 +162,7 @@ public class TripController {
         post.setCoverUrl(memoryCard.getImageUrl());
         post.setCategoryId(request != null && request.getCategoryId() != null 
             ? request.getCategoryId() 
-            : getDefaultCategoryId());
+            : resolveDefaultCategoryId());
         post.setStatus(1);
         post.setViewCount(0);
         post.setLikeCount(0);
@@ -226,10 +233,25 @@ public class TripController {
     /**
      * 获取默认分类ID（游记/旅游分享）
      */
-    private Integer getDefaultCategoryId() {
-        // TODO: 从数据库查询"游记"或"旅游分享"分类
-        // 如果没有，返回第一个分类ID
-        return 1; // 临时返回1，实际应从数据库查询
+    private Integer resolveDefaultCategoryId() {
+        List<Category> categories = categoryService.listAllCategories();
+        if (categories == null || categories.isEmpty()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "请先创建帖子分类");
+        }
+
+        for (String preferredName : List.of("游记", "旅行分享")) {
+            for (Category category : categories) {
+                if (preferredName.equals(category.getName())) {
+                    return category.getId();
+                }
+            }
+        }
+
+        Category firstCategory = categories.get(0);
+        if (firstCategory.getId() == null) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "帖子分类配置异常");
+        }
+        return firstCategory.getId();
     }
 }
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="helper-page">
+  <div class="helper-page" :class="{ embedded }">
     <!-- 侧边栏 -->
     <ChatSidebar
       v-if="showSidebar"
@@ -45,7 +45,7 @@
       
       <!-- 数字人悬浮按钮 -->
       <transition name="scale-fade">
-        <div v-if="!showDigitalHuman" class="digital-human-fab">
+        <div v-if="!embedded && !showDigitalHuman" class="digital-human-fab">
           <button 
             @click="toggleDigitalHuman" 
             class="fab-button"
@@ -60,7 +60,7 @@
 
     <!-- 数字人全屏面板 -->
     <transition name="modal-fade">
-      <div v-if="showDigitalHuman" class="digital-human-overlay" @click.self="toggleDigitalHuman">
+      <div v-if="!embedded && showDigitalHuman" class="digital-human-overlay" @click.self="toggleDigitalHuman">
         <div class="digital-human-panel" @click.stop>
           <div class="digital-human-header">
             <div class="header-left">
@@ -92,6 +92,10 @@ import DigitalHumanIframe from '@/components/DigitalHumanIframe.vue'
 import type { Conversation } from '@/types/chat'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 import { getUserConversations, deleteConversation } from '@/api/conversationController'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false
+})
 
 const showSidebar = ref(false)
 const isLoading = ref(false)
@@ -260,10 +264,23 @@ function onDigitalHumanLoaded() {
   background: #ffffff;
 }
 
+.helper-page.embedded {
+  height: 100%;
+  min-height: 720px;
+  border-radius: 24px;
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+}
+
 @supports (height: 100dvh) {
   .helper-page {
     height: calc(100dvh - 128px);
     min-height: calc(100dvh - 128px);
+  }
+
+  .helper-page.embedded {
+    height: 100%;
+    min-height: 720px;
   }
 }
 

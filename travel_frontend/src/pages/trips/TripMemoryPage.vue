@@ -1,6 +1,6 @@
 <template>
-  <div class="memory-page" v-if="tripId">
-    <div class="page-header">
+  <div class="memory-page" :class="{ embedded }" v-if="tripId">
+    <div v-if="!embedded" class="page-header">
       <h1 class="page-title">生成回忆图</h1>
       <p class="page-subtitle">上传旅行照片，AI 将为您生成精美的回忆图</p>
     </div>
@@ -180,6 +180,10 @@ import { uploadPhotos, getTripPhotos, deletePhoto } from '@/api/tripPhotoControl
 import { generateMemoryCard, getMemoryCardStatus, getMemoryCardByTripId } from '@/api/memoryCardController'
 import request from '@/request'
 import { message } from 'ant-design-vue'
+
+withDefaults(defineProps<{ embedded?: boolean }>(), {
+  embedded: false
+})
 
 const route = useRoute()
 const router = useRouter()
@@ -586,7 +590,10 @@ function downloadImage() {
 
 // 返回行程详情
 function goToTrip() {
-  router.push(`/trips/${tripId}`)
+  router.push({
+    path: `/trips/${tripId}`,
+    query: { tab: 'memory' }
+  })
 }
 
 onUnmounted(() => {
@@ -609,6 +616,12 @@ onUnmounted(() => {
   @media (max-width: 768px) {
     padding: 24px 16px;
   }
+}
+
+.memory-page.embedded {
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
 
 .page-header {

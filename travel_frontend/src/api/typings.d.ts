@@ -173,6 +173,20 @@ declare namespace API {
     id: number
   }
 
+  type ContentImageVO = {
+    id?: number
+    alt?: string
+    photographer?: string
+    photographerUrl?: string
+    pexelsUrl?: string
+    width?: number
+    height?: number
+    mediumUrl?: string
+    largeUrl?: string
+    large2xUrl?: string
+    landscapeUrl?: string
+  }
+
   type createConversationParams = {
     userId: number
     title?: string
@@ -255,6 +269,11 @@ declare namespace API {
   type getConversationParams = {
     conversationId: number
     userId: number
+  }
+
+  type searchContentImagesParams = {
+    query: string
+    perPage?: number
   }
 
   type getHotTagsParams = {
@@ -405,6 +424,7 @@ declare namespace API {
   type LoginUserVO = {
     id?: number
     userAzccount?: string
+    userAccount?: string
     userName?: string
     userAvatar?: string
     userProfile?: string
@@ -428,6 +448,20 @@ declare namespace API {
   }
 
   type MemoryCardVO = {
+    id?: number
+    tripId?: number
+    userId?: number
+    templateName?: string
+    imageUrl?: string
+    taskId?: string
+    status?: string
+    errorMessage?: string
+    retryCount?: number
+    createTime?: string
+    updateTime?: string
+  }
+
+  type MemoryCardHistory = {
     id?: number
     tripId?: number
     userId?: number
@@ -1024,6 +1058,20 @@ declare namespace API {
     timestamp?: number
   }
 
+  type ResponseDTOListMemoryCardHistory = {
+    code?: number
+    message?: string
+    data?: MemoryCardHistory[]
+    timestamp?: number
+  }
+
+  type ResponseDTOListContentImageVO = {
+    code?: number
+    message?: string
+    data?: ContentImageVO[]
+    timestamp?: number
+  }
+
   type ResponseDTOLoginUserVO = {
     code?: number
     message?: string
@@ -1331,6 +1379,7 @@ declare namespace API {
     startDate?: string
     endDate?: string
     dailyHighlights?: Record<string, any>
+    structuredData?: string
   }
 
   type TripVO = {
@@ -1348,6 +1397,8 @@ declare namespace API {
     updateTime?: string
     photos?: TripPhotoVO[]
     memoryCard?: MemoryCardVO
+    publishedToInspiration?: boolean
+    publishedPostId?: number
   }
 
   type updateConversationTitleParams = {

@@ -26,6 +26,8 @@
 
 <script lang="ts" setup>
 import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import ChatMessage from './ChatMessage.vue'
 import ItineraryCard from './ItineraryCard.vue'
 import type { StructuredItinerary } from '@/types/itinerary'
@@ -45,6 +47,7 @@ const listRef = ref<HTMLElement | null>(null)
 const endRef = ref<HTMLElement | null>(null)
 const { scrollToBottom } = useAutoScroll(listRef, endRef, { getLength: () => messages.value.length })
 const loginUserStore = useLoginUserStore()
+const router = useRouter()
 
 // 暴露控制函数给父组件
 async function start(task: string, conversationId?: string, onConversationCreated?: (conversationId: string) => void) {
@@ -272,14 +275,15 @@ async function handleSaveItinerary(itinerary: StructuredItinerary) {
     
     if (response.data.code === 0 && response.data.data) {
       console.log('✅ 保存成功，行程ID:', response.data.data)
-      alert(`✅ 行程已保存！\n行程ID: ${response.data.data}\n\n可以在"我的行程"中查看`)
+      message.success('行程已保存，正在跳转到详情页')
+      router.push(`/trips/${response.data.data}`)
     } else {
       console.error('❌ 保存失败:', response.data.message)
-      alert(`❌ 保存失败: ${response.data.message || '未知错误'}`)
+      message.error(response.data.message || '保存失败')
     }
   } catch (error: any) {
     console.error('❌ 保存行程时发生错误:', error)
-    alert(`❌ 保存失败: ${error.message || '网络错误'}`)
+    message.error(error.message || '保存失败')
   }
 }
 

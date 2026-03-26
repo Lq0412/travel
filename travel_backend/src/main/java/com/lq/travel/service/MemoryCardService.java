@@ -4,8 +4,11 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.lq.travel.model.dto.trip.MemoryCardGenerateRequest;
 import com.lq.travel.model.dto.trip.MemoryCardGenerateResponse;
 import com.lq.travel.model.entity.MemoryCard;
+import com.lq.travel.model.entity.MemoryCardHistory;
 import com.lq.travel.model.entity.User;
 import com.lq.travel.model.vo.MemoryCardVO;
+
+import java.util.List;
 
 /**
  * 回忆图服务接口
@@ -26,6 +29,21 @@ public interface MemoryCardService extends IService<MemoryCard> {
      * 根据行程ID获取回忆图
      */
     MemoryCardVO getMemoryCardByTripId(Long tripId, Long userId);
+
+    /**
+     * 重新生成回忆图
+     */
+    MemoryCardGenerateResponse regenerateMemoryCard(Long tripId, User user);
+
+    /**
+     * 查询历史版本
+     */
+    List<MemoryCardHistory> listHistoryByTripId(Long tripId, Long userId);
+
+    /**
+     * 将历史版本设为当前
+     */
+    boolean setCurrentFromHistory(Long historyId, Long userId);
 
     /**
      * 上传图片到 COS（用于消费者侧）

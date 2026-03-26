@@ -9,12 +9,17 @@ import com.lq.travel.AI.core.model.AIResponse;
 import com.lq.travel.AI.core.service.AIService;
 import com.lq.travel.exception.BusinessException;
 import com.lq.travel.exception.ErrorCode;
+import com.lq.travel.mapper.MemoryCardMapper;
+import com.lq.travel.mapper.PostMapper;
 import com.lq.travel.mapper.TripMapper;
 import com.lq.travel.model.dto.trip.TripGenerateRequest;
 import com.lq.travel.model.dto.trip.TripGenerateResponse;
 import com.lq.travel.model.dto.trip.TripSaveRequest;
+import com.lq.travel.model.entity.MemoryCard;
+import com.lq.travel.model.entity.Post;
 import com.lq.travel.model.entity.Trip;
 import com.lq.travel.model.entity.User;
+import com.lq.travel.model.vo.MemoryCardVO;
 import com.lq.travel.model.vo.TripPhotoVO;
 import com.lq.travel.model.vo.TripVO;
 import com.lq.travel.service.TripPhotoService;
@@ -26,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,6 +42,9 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements TripService {
+
+    private static final String STATUS_PLANNED = "planned";
+    private static final String STATUS_COMPLETED = "completed";
     
     @Resource
     private AIService aiService;
@@ -43,6 +52,12 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements Tr
     @Autowired
     @Lazy
     private TripPhotoService tripPhotoService;
+
+    @Resource
+    private MemoryCardMapper memoryCardMapper;
+
+    @Resource
+    private PostMapper postMapper;
     
     private final ObjectMapper objectMapper = new ObjectMapper();
     
@@ -253,7 +268,7 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements Tr
         trip.setTheme(request.getTheme());
         trip.setStartDate(request.getStartDate());
         trip.setEndDate(request.getEndDate());
-        trip.setStatus("accepted"); // 已接受状态
+        trip.setStatus(STATUS_PLANNED);
         
         // 将dailyHighlights转换为JSON字符串
         try {
@@ -283,6 +298,7 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements Tr
         QueryWrapper<Trip> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId);
         queryWrapper.eq("is_delete", 0);
+        queryWrapper.orderByDesc("update_time");
         queryWrapper.orderByDesc("create_time");
         
         List<Trip> trips = this.list(queryWrapper);
@@ -341,6 +357,7 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements Tr
     private TripVO convertToVO(Trip trip) {
         TripVO vo = new TripVO();
         BeanUtils.copyProperties(trip, vo);
+        vo.setStatus(normalizeTripStatus(trip.getStatus()));
         
         // 解析dailyHighlights JSON
         try {
@@ -368,8 +385,52 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements Tr
         // 获取照片列表
         List<TripPhotoVO> photos = tripPhotoService.getTripPhotos(trip.getId());
         vo.setPhotos(photos);
+
+        MemoryCard currentMemoryCard = loadCurrentMemoryCard(trip.getId());
+        if (currentMemoryCard != null) {
+            vo.setMemoryCard(convertMemoryCardToVO(currentMemoryCard));
+
+            Post publishedPost = findPublishedPost(trip.getUserId(), currentMemoryCard.getImageUrl());
+            if (publishedPost != null) {
+                vo.setPublishedToInspiration(Boolean.TRUE);
+                vo.setPublishedPostId(publishedPost.getId());
+            } else {
+                vo.setPublishedToInspiration(Boolean.FALSE);
+            }
+        } else {
+            vo.setPublishedToInspiration(Boolean.FALSE);
+        }
         
         return vo;
+    }
+
+    private String normalizeTripStatus(String status) {
+        return STATUS_COMPLETED.equals(status) ? STATUS_COMPLETED : STATUS_PLANNED;
+    }
+
+    private MemoryCard loadCurrentMemoryCard(Long tripId) {
+        return memoryCardMapper.selectOne(new QueryWrapper<MemoryCard>()
+                .eq("trip_id", tripId)
+                .eq("is_delete", 0)
+                .orderByDesc("create_time")
+                .last("limit 1"));
+    }
+
+    private MemoryCardVO convertMemoryCardToVO(MemoryCard memoryCard) {
+        MemoryCardVO vo = new MemoryCardVO();
+        BeanUtils.copyProperties(memoryCard, vo);
+        return vo;
+    }
+
+    private Post findPublishedPost(Long userId, String coverUrl) {
+        if (!StringUtils.hasText(coverUrl)) {
+            return null;
+        }
+        return postMapper.selectOne(new QueryWrapper<Post>()
+                .eq("user_id", userId)
+                .eq("cover_url", coverUrl)
+                .orderByDesc("create_time")
+                .last("limit 1"));
     }
 }
 

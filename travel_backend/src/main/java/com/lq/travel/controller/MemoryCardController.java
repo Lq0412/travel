@@ -78,8 +78,7 @@ public class MemoryCardController {
             @PathVariable Long tripId,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
-        MemoryCardGenerateResponse response = ((com.lq.travel.service.impl.MemoryCardServiceImpl) memoryCardService)
-                .regenerateMemoryCard(tripId, loginUser);
+        MemoryCardGenerateResponse response = memoryCardService.regenerateMemoryCard(tripId, loginUser);
         return ResponseUtils.success(response);
     }
 
@@ -92,10 +91,8 @@ public class MemoryCardController {
             @PathVariable Long tripId,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
-        // 简化：直接在实现类中用 QueryWrapper 查询
         java.util.List<com.lq.travel.model.entity.MemoryCardHistory> list =
-                ((com.lq.travel.service.impl.MemoryCardServiceImpl) memoryCardService)
-                        .listHistoryByTripId(tripId, loginUser.getId());
+                memoryCardService.listHistoryByTripId(tripId, loginUser.getId());
         return ResponseUtils.success(list);
     }
 
@@ -108,8 +105,7 @@ public class MemoryCardController {
             @PathVariable Long historyId,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
-        boolean ok = ((com.lq.travel.service.impl.MemoryCardServiceImpl) memoryCardService)
-                .setCurrentFromHistory(historyId, loginUser.getId());
+        boolean ok = memoryCardService.setCurrentFromHistory(historyId, loginUser.getId());
         return ResponseUtils.success(ok);
     }
 }

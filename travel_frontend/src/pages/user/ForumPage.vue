@@ -7,7 +7,7 @@
         <div class="search-container">
           <a-input-search
             v-model:value="searchParams.keyword"
-            placeholder="搜索帖子内容..."
+            placeholder="搜索灵感内容..."
             enter-button="搜索"
             size="large"
             @search="handleSearch"
@@ -30,7 +30,7 @@
         
         <a-button type="primary" @click="showCreate = true" class="publish-btn">
           <img src="https://unpkg.com/lucide-static@latest/icons/edit.svg" class="btn-icon" alt="edit">
-          <span class="btn-text">发布帖子</span>
+          <span class="btn-text">发布灵感</span>
         </a-button>
       </div>
       
@@ -113,7 +113,7 @@
         </div>
       </div>
       <div v-if="!loading && (!displayedPosts || displayedPosts.length === 0)" class="empty">
-        还没有帖子，快来发布第一条吧～
+        还没有灵感内容，先完成一次旅行闭环吧～
       </div>
     </div>
 
@@ -131,7 +131,7 @@
     <!-- 发布帖子模态框 -->
     <a-modal
       v-model:open="showCreate"
-      title="发布帖子"
+      title="发布灵感"
       :confirm-loading="creating"
       @ok="handleCreate"
       @open="handleCreateModalOpen"
@@ -490,11 +490,6 @@ import { formatTime } from '@/util/timeUtils'
 import { ReloadOutlined, DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import type { UploadProps, UploadFile } from 'ant-design-vue'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
-// 示例图片（用于演示画廊功能），使用项目内已有资源作为占位
-// 备用示例图（字符串路径，避免图片模块声明报错）
-// 注意：当前使用项目中的本地占位图片作为示例（会在详情画廊中重复三次用于演示）。
-// TODO: 真实数据应由后端提供图片数组（pictureUrls / images / coverUrl 等），请在后端接口可用后替换此处逻辑。
-const sampleImg = '/src/assets/user-avatar.jpg'
 
 const router = useRouter()
 const route = useRoute()
@@ -1088,12 +1083,9 @@ async function openDetail(post: API.PostVO) {
   // 获取点赞和收藏状态
   await Promise.all([checkLikeStatus(post.id), checkFavoriteStatus(post.id), fetchModalComments()])
 
-  // 准备画廊数据：优先使用帖子自己的图片列表或 coverUrl；否则使用示例图片三张
+  // 准备画廊数据：优先使用帖子自己的图片列表或 coverUrl
   try {
-    // 提示：这里最终应由后端返回图片列表并赋值给 galleryImages。当前使用本地占位图作为演示。
     const imgs: string[] = []
-    // 假定后端可能返回 pictureUrls 或 images 字段
-    // 兼容性处理：优先使用常见字段，否则 fallback 到 coverUrl
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const anyPost: any = post as any
     if (Array.isArray(anyPost.pictureUrls) && anyPost.pictureUrls.length > 0) {
@@ -1104,16 +1096,15 @@ async function openDetail(post: API.PostVO) {
       imgs.push(post.coverUrl)
     }
 
-    // 如果最终没有图片，则用示例图片重复三次展示效果（第一张为封面）
     if (imgs.length === 0) {
-      imgs.push(sampleImg, sampleImg, sampleImg)
+      imgs.push(post.coverUrl || defaultCover)
     }
 
     galleryImages.value = imgs
     activeImageIndex.value = 0
   } catch (error) {
     console.error('准备画廊数据失败:', error)
-    galleryImages.value = [sampleImg, sampleImg, sampleImg]
+    galleryImages.value = [post.coverUrl || defaultCover]
     activeImageIndex.value = 0
   }
 }

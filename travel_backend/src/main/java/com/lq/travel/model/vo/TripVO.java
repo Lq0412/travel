@@ -35,6 +35,16 @@ public class TripVO implements Serializable {
      * 回忆图信息
      */
     private MemoryCardVO memoryCard;
+
+    /**
+     * 是否已发布到灵感广场
+     */
+    private Boolean publishedToInspiration;
+
+    /**
+     * 已发布内容ID
+     */
+    private Long publishedPostId;
     
     private static final long serialVersionUID = 1L;
 }

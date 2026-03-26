@@ -10,7 +10,7 @@ import './access'
 const app = createApp(App)
 
 // 配置 Ant Design Vue 主题，统一远航蓝视觉系统
-app.use(Antd, {
+app.use(Antd as any, {
   theme: {
     token: {
       // 主色系 - Ocean teal
