@@ -1,47 +1,24 @@
 <template>
   <div class="home-page">
     <section class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">AI 旅行工作台</p>
-        <h1>把 AI 旅行做成一条完整闭环，而不是功能拼盘。</h1>
-        <p class="intro">
-          从需求输入、候选行程生成、DIY 编辑，到照片沉淀、回忆图生成和游记发布，
-          让一次旅行从灵感出现到内容沉淀都能在同一个产品里完成。
-        </p>
-        <div class="hero-actions">
-          <a-button type="primary" size="large" @click="enterPrimary">
-            {{ isLoggedIn ? '进入旅行工作台' : '登录后开始规划' }}
-          </a-button>
-          <a-button size="large" @click="goInspiration">查看灵感广场</a-button>
+      <div class="hero-content">
+        <div class="hero-text">
+          <h1>让每段旅程<br>都值得刻下</h1>
+          <p class="hero-desc">
+            从灵感到回忆，AI 助你规划行程、记录旅途、沉淀故事。
+            一次旅行，完整体验。
+          </p>
+          <div class="hero-actions">
+            <a-button type="primary" size="large" @click="enterPrimary">
+              {{ isLoggedIn ? '开始规划' : '立即体验' }}
+            </a-button>
+            <a-button size="large" @click="goInspiration">探索灵感</a-button>
+          </div>
         </div>
-      </div>
 
-      <div class="hero-visuals">
-        <article class="hero-illustration hero-illustration-stage">
-          <span class="illustration-halo illustration-halo-one"></span>
-          <span class="illustration-halo illustration-halo-two"></span>
-          <img :src="illustrations.travelMode" alt="travel illustration">
-          <div class="illustration-copy">
-            <strong>AI 与旅行场景结合</strong>
-            <p>用插画解释工作流，用真实照片补足旅途温度。</p>
-          </div>
-        </article>
-
-        <article v-if="heroPhotos[0]" class="floating-photo floating-photo-primary">
-          <img :src="photoSrc(heroPhotos[0])" :alt="heroPhotos[0].alt || '旅行视觉图'">
-          <div class="floating-photo-caption">
-            <strong>真实旅途氛围</strong>
-            <PexelsCredit :image="heroPhotos[0]" compact />
-          </div>
-        </article>
-
-        <article v-if="heroPhotos[1]" class="floating-photo floating-photo-secondary">
-          <img :src="photoSrc(heroPhotos[1])" :alt="heroPhotos[1].alt || '规划场景图'">
-          <div class="floating-photo-caption">
-            <strong>规划现场</strong>
-            <PexelsCredit :image="heroPhotos[1]" compact />
-          </div>
-        </article>
+        <div class="hero-visual">
+          <img :src="illustrations.travelMode" alt="旅行插画" class="hero-illustration">
+        </div>
       </div>
     </section>
 
@@ -79,7 +56,7 @@
         <div class="proof-grid">
           <div class="proof-card">
             <strong>产品结构</strong>
-            <p>一级导航只保留首页、工作台、我的行程、灵感广场和我的。</p>
+            <p>一级导航只保留首页、规划行程、我的行程、灵感广场和我的。</p>
           </div>
           <div class="proof-card">
             <strong>工程可靠</strong>
@@ -134,7 +111,7 @@ const workflowSteps = [
     key: 'publish',
     index: '沉淀',
     title: '一键沉淀为灵感内容',
-    desc: '用回忆图作为封面，生成可展示的游记/攻略，让作品具备完整闭环结果。',
+    desc: '用回忆图作为封面，生成可展示的游记/攻略，让旅程留下可分享的内容。',
     points: ['发布前校验回忆图', '自动归档到灵感广场', '形成可复用内容资产'],
   },
 ]
@@ -171,192 +148,52 @@ onMounted(loadVisuals)
 }
 
 .hero {
+  padding: 60px 48px;
+  border-radius: 32px;
+  background: linear-gradient(135deg, #f0f6ff 0%, #fff9f2 100%);
+  box-shadow: 0 20px 60px rgba(18, 52, 97, 0.08);
+}
+
+.hero-content {
   display: grid;
-  grid-template-columns: minmax(0, 0.96fr) minmax(420px, 1.04fr);
-  gap: 28px;
-  align-items: stretch;
-  padding: 38px;
-  border-radius: 34px;
-  background:
-    radial-gradient(circle at top left, rgba(47, 144, 240, 0.18), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(212, 139, 31, 0.12), transparent 28%),
-    linear-gradient(135deg, #ffffff 0%, #f4f8ff 58%, #fff8ee 100%);
-  box-shadow: 0 18px 44px rgba(18, 52, 97, 0.05);
-
-  h1 {
-    margin: 8px 0 16px;
-    font-size: 56px;
-    line-height: 1.05;
-    color: var(--color-text);
-  }
-}
-
-.hero-copy {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 0;
-}
-
-.hero-visuals {
-  position: relative;
-  min-height: 500px;
-  padding: 0;
-}
-
-.floating-photo,
-.hero-illustration {
-  position: relative;
-  border-radius: 26px;
-}
-
-.floating-photo {
-  overflow: hidden;
-  background: #ffffff;
-  box-shadow:
-    0 18px 42px rgba(18, 52, 97, 0.12),
-    0 0 0 1px rgba(255, 255, 255, 0.72);
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-}
-
-.story-media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.hero-illustration-stage {
-  z-index: 1;
-  min-height: 500px;
-  padding: 42px 36px 34px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
   align-items: center;
-  gap: 16px;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.18) 36%, transparent 62%),
-    radial-gradient(circle at bottom right, rgba(255, 244, 226, 0.88), rgba(255, 244, 226, 0.08) 34%, transparent 60%),
-    linear-gradient(145deg, rgba(238, 244, 255, 0.96) 0%, rgba(255, 249, 239, 0.86) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
-
-  img {
-    position: relative;
-    z-index: 2;
-    width: 100%;
-    max-width: 410px;
-    height: auto;
-  }
 }
 
-.illustration-copy {
-  position: relative;
-  z-index: 2;
-  text-align: center;
-
-  strong {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 28px;
+.hero-text {
+  h1 {
+    margin: 0 0 20px;
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1.15;
     color: var(--color-text);
   }
-
-  p {
-    max-width: 360px;
-    margin: 0;
-    color: var(--color-muted);
-    font-size: 16px;
-    line-height: 1.7;
-  }
 }
 
-.illustration-halo {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(4px);
-  opacity: 0.85;
-}
-
-.illustration-halo-one {
-  top: 34px;
-  left: 34px;
-  width: 170px;
-  height: 170px;
-  background: radial-gradient(circle, rgba(47, 144, 240, 0.24) 0%, transparent 72%);
-}
-
-.illustration-halo-two {
-  right: 30px;
-  bottom: 24px;
-  width: 210px;
-  height: 210px;
-  background: radial-gradient(circle, rgba(212, 139, 31, 0.2) 0%, transparent 72%);
-}
-
-.floating-photo {
-  position: absolute;
-  z-index: 3;
-}
-
-.floating-photo-primary {
-  left: 10px;
-  bottom: 14px;
-  width: 240px;
-  height: 164px;
-  transform: translate(-6px, 8px) rotate(-4deg);
-}
-
-.floating-photo-secondary {
-  top: 14px;
-  right: 10px;
-  width: 200px;
-  height: 274px;
-  transform: translate(6px, -4px) rotate(5deg);
-}
-
-.floating-photo-caption {
-  position: absolute;
-  inset: auto 0 0 0;
-  padding: 14px;
-  background: linear-gradient(180deg, rgba(15, 28, 46, 0.08) 0%, rgba(15, 28, 46, 0.82) 100%);
-
-  strong {
-    display: block;
-    margin-bottom: 8px;
-    color: #ffffff;
-    font-size: 16px;
-  }
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--primary-600);
-}
-
-.intro {
-  max-width: 720px;
-  margin: 0;
-  font-size: 17px;
+.hero-desc {
+  margin: 0 0 32px;
+  font-size: 18px;
+  line-height: 1.7;
   color: var(--color-text-secondary);
 }
 
 .hero-actions {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
-  margin-top: 28px;
+}
+
+.hero-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hero-illustration {
+  max-width: 100%;
+  height: auto;
+  max-height: 400px;
 }
 
 .story-section,
@@ -497,11 +334,6 @@ onMounted(loadVisuals)
   .proof-grid {
     grid-template-columns: 1fr;
   }
-
-  .hero-visuals {
-    min-height: 0;
-    padding: 0;
-  }
 }
 
 @media (max-width: 768px) {
@@ -509,45 +341,25 @@ onMounted(loadVisuals)
     padding: 20px 12px 48px;
   }
 
-  .hero,
-  .story-section,
-  .proof-section {
-    padding: 22px 18px;
+  .hero {
+    padding: 32px 20px;
   }
 
-  .hero h1 {
-    font-size: 38px;
+  .hero-content {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .hero-text h1 {
+    font-size: 36px;
+  }
+
+  .hero-desc {
+    font-size: 16px;
   }
 
   .section-heading h2 {
     font-size: 26px;
-  }
-
-  .hero-visuals {
-    display: grid;
-    gap: 14px;
-    min-height: 0;
-    padding: 0;
-  }
-
-  .hero-illustration-stage {
-    min-height: 320px;
-    padding: 30px 20px 24px;
-
-    img {
-      max-width: 240px;
-    }
-  }
-
-  .illustration-copy strong {
-    font-size: 22px;
-  }
-
-  .floating-photo {
-    position: static;
-    width: 100%;
-    height: 190px;
-    transform: none;
   }
 
   .story-media {

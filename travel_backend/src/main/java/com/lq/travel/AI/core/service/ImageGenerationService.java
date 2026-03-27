@@ -45,7 +45,7 @@ public interface ImageGenerationService {
         
         /**
          * 风格：fresh（清新）或 documentary（纪实）
-         */
+         */ 
         private String style = "fresh";
         
         /**

@@ -1,10 +1,14 @@
 package com.lq.travel.AI.core.config;
 
+import com.lq.travel.AI.core.provider.DashScopeProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+
+import java.util.Arrays;
 
 /**
  * AI配置验证器
@@ -16,6 +20,9 @@ public class AIConfigurationValidator {
     
     @Value("${spring.ai.dashscope.api-key}")
     private String dashScopeApiKey;
+
+    @Autowired(required = false)
+    private DashScopeProvider dashScopeProvider;
     
     @Value("${spring.ai.dashscope.chat.options.model}")
     private String defaultModel;
@@ -31,7 +38,7 @@ public class AIConfigurationValidator {
     
     @Value("${spring.ai.dashscope.chat.options.max-retries}")
     private Integer maxRetries;
-    
+
     @EventListener(ApplicationReadyEvent.class)
     public void validateConfiguration() {
         log.info("开始验证AI配置...");
@@ -46,13 +53,13 @@ public class AIConfigurationValidator {
         }
         
         // 验证模型配置
-        String[] validModels = {"qwen-plus", "qwen-turbo", "qwen-max", "qwen-long", "qwen-7b-chat", "qwen-14b-chat"};
+        String[] validModels = dashScopeProvider != null ? dashScopeProvider.getAvailableModels() : null;
+        if (validModels == null || validModels.length == 0) {
+            validModels = new String[]{"qwen-plus", "qwen-turbo", "qwen-max", "qwen-long", "qwen-7b-chat", "qwen-14b-chat"};
+        }
         boolean validModel = false;
-        for (String model : validModels) {
-            if (model.equals(defaultModel)) {
-                validModel = true;
-                break;
-            }
+        if (defaultModel != null) {
+            validModel = Arrays.asList(validModels).contains(defaultModel);
         }
         
         if (!validModel) {

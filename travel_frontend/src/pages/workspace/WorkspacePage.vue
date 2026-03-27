@@ -2,8 +2,8 @@
   <div class="workspace-page">
     <section class="workspace-hero">
       <div class="hero-copy">
-        <p class="eyebrow">旅行工作台</p>
-        <h1>把需求澄清、候选方案、真实行程和内容沉淀放在同一块画布上。</h1>
+        <p class="eyebrow">规划行程</p>
+        <h1>从需求到回忆，把整段旅程放在同一块画布上。</h1>
         <p class="hero-intro">
           左侧负责对话澄清，中间负责生成和 DIY 编辑，右侧持续显示最近行程、配套推荐和下一步动作，
           让整个旅程推进更连贯，而不是多个彼此孤立的页面。
@@ -26,7 +26,7 @@
 
       <div class="hero-visuals">
         <article v-if="workspacePhotos[0]" class="hero-photo hero-photo-main">
-          <img :src="photoSrc(workspacePhotos[0])" :alt="workspacePhotos[0].alt || '旅行工作台氛围图'">
+          <img :src="photoSrc(workspacePhotos[0])" :alt="workspacePhotos[0].alt || '规划行程氛围图'">
           <div class="photo-caption">
             <strong>真实场景承接工作流</strong>
             <p>用旅行照片把 AI 规划、出行执行和内容沉淀放回真实世界。</p>
@@ -38,8 +38,8 @@
           <article class="illustration-card">
             <img :src="illustrations.journey" alt="journey illustration">
             <div>
-              <strong>工作台 = 闭环中控台</strong>
-              <p>不是再造一个首页，而是把闭环节点集中呈现。</p>
+              <strong>规划中心</strong>
+              <p>不是再造一个首页，而是把旅程节点集中呈现。</p>
             </div>
           </article>
 
@@ -57,7 +57,7 @@
       <article class="metric-card">
         <strong>{{ isLoggedIn ? trips.length : '登录后可见' }}</strong>
         <span>已保存行程</span>
-        <p>工作台不做伪数据，只展示你自己的真实资产。</p>
+        <p>规划中心不做伪数据，只展示你自己的真实资产。</p>
       </article>
       <article class="metric-card">
         <strong>{{ isLoggedIn ? plannedCount : '登录后可见' }}</strong>
@@ -117,7 +117,7 @@
         <article class="rail-card">
           <div class="rail-head">
             <div>
-              <p class="panel-kicker">闭环推进</p>
+              <p class="panel-kicker">旅程推进</p>
               <h3>下一步动作</h3>
             </div>
             <a-button type="link" @click="goTrips">去行程库</a-button>

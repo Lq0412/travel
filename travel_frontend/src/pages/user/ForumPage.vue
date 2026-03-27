@@ -113,7 +113,7 @@
         </div>
       </div>
       <div v-if="!loading && (!displayedPosts || displayedPosts.length === 0)" class="empty">
-        还没有灵感内容，先完成一次旅行闭环吧～
+        还没有灵感内容，先完成一次旅程吧～
       </div>
     </div>
 

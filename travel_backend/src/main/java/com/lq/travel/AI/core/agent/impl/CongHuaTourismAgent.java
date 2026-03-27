@@ -621,7 +621,7 @@ public class CongHuaTourismAgent extends BaseAgent {
                 .message(enhancedPrompt)
                 .systemPrompt(systemPrompt)
                 .temperature(0.7)
-                .maxTokens(3000)
+                .maxTokens(2000)
                 .stream(true)
                 .build();
             

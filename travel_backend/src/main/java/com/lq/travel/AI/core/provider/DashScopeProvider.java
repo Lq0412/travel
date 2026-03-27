@@ -277,9 +277,8 @@ public class DashScopeProvider implements AIProvider {
     @Override
     public String[] getAvailableModels() {
         return new String[]{
-            "qwen-plus",      // 通义千问增强版
-            "qwen-turbo",     // 通义千问标准版
-            "qwen-max",       // 通义千问旗舰版
+            "tongyi-xiaomi-analysis-pro",
+
         };
     }
     

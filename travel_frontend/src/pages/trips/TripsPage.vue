@@ -3,7 +3,7 @@
     <section class="page-header">
       <div>
         <p class="eyebrow">我的行程</p>
-        <h1>行程库只保留闭环推进所需的信息。</h1>
+        <h1>行程库只保留旅程推进所需的信息。</h1>
         <p>支持按状态、是否已有回忆图、是否已发布筛选，并默认按最近修改排序。</p>
       </div>
       <a-button type="primary" size="large" @click="goWorkspace">新建行程</a-button>
@@ -85,7 +85,7 @@
       </button>
     </section>
 
-    <a-empty v-else description="没有符合条件的行程，先去工作台生成第一版方案" />
+    <a-empty v-else description="没有符合条件的行程，先去规划行程生成第一版方案" />
   </div>
 </template>
 

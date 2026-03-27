@@ -78,7 +78,7 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements Tr
         AIRequest aiRequest = AIRequest.builder()
                 .message(prompt)
                 .systemPrompt("你是一个专业的旅行规划师，擅长根据用户需求生成详细的旅行行程方案。请以JSON格式返回结果。")
-                .maxTokens(3000)
+                .maxTokens(2000)
                 .temperature(0.7)
                 .build();
         

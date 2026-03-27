@@ -3,10 +3,26 @@
     <header class="landing-header" :class="{ scrolled: isScrolled }">
       <div class="header-inner">
         <router-link to="/" class="brand">
-          <span class="brand-mark">AI</span>
+          <svg class="brand-logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- 背景圆 -->
+            <circle cx="24" cy="24" r="22" fill="url(#logoGrad)"/>
+            <!-- 山峰 -->
+            <path d="M12 32L20 20L26 26L36 14" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <path d="M8 36H40" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+            <!-- 飞机 -->
+            <path d="M32 10L35 13L28 20L26 18L32 10Z" fill="white"/>
+            <path d="M26 18L22 22L24 24L28 20L26 18Z" fill="white" opacity="0.8"/>
+            <!-- 渐变定义 -->
+            <defs>
+              <linearGradient id="logoGrad" x1="0" y1="0" x2="48" y2="48">
+                <stop offset="0%" stop-color="#38bdf8"/>
+                <stop offset="100%" stop-color="#0284c7"/>
+              </linearGradient>
+            </defs>
+          </svg>
           <div>
-            <strong>旅行闭环工作台</strong>
-            <small>规划 · 执行 · 沉淀</small>
+            <strong>旅刻</strong>
+            <small>AI 旅行助手</small>
           </div>
         </router-link>
 
@@ -65,11 +81,11 @@
     <footer class="landing-footer">
       <div class="footer-inner">
         <div>
-          <strong>AI 旅行闭环工作台</strong>
-          <p>把旅行前、中、后的关键动作串成一条顺滑、完整的旅程体验。</p>
+          <strong>旅刻</strong>
+          <p>从灵感到回忆，让每段旅程都值得刻下。</p>
         </div>
         <div class="footer-links">
-          <router-link to="/workspace">旅行工作台</router-link>
+          <router-link to="/workspace">规划行程</router-link>
           <router-link to="/trips">我的行程</router-link>
           <router-link to="/inspiration">灵感广场</router-link>
         </div>
@@ -90,7 +106,7 @@ const loginUserStore = useLoginUserStore()
 
 const navItems = [
   { label: '首页', path: '/' },
-  { label: '旅行工作台', path: '/workspace' },
+  { label: '规划行程', path: '/workspace' },
   { label: '我的行程', path: '/trips' },
   { label: '灵感广场', path: '/inspiration' },
 ]
@@ -214,18 +230,10 @@ onUnmounted(() => {
   }
 }
 
-.brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #1f3476 0%, #2f90f0 100%);
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+.brand-logo {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
 }
 
 .nav-links {
