@@ -1,46 +1,53 @@
 <template>
   <div class="helper-page" :class="{ embedded }">
-    <!-- 侧边栏 -->
-    <ChatSidebar
-      v-if="showSidebar"
-      :conversations="conversations"
-      :activeId="currentConversationId"
-      @close="showSidebar = false"
-      @switch="handleSwitch"
-      @delete="handleDelete"
-      @new="handleNew"
-      class="sidebar"
-    />
-
     <!-- 聊天卡片 -->
-    <div class="chat-main" :class="{ 'sidebar-open': showSidebar }">
+    <div class="chat-main">
       <div class="chat-content">
         <!-- 头部 -->
         <div class="chat-header">
-        <button @click="showSidebar = !showSidebar" class="menu-btn glass-btn" aria-label="菜单">
-          <img src="https://unpkg.com/lucide-static@latest/icons/menu.svg" alt="菜单" class="icon" />
-        </button>
-        
-        <div class="header-title">
-          <img src="https://unpkg.com/lucide-static@latest/icons/sparkles.svg" alt="" class="title-icon" />
-          <h2>AI 旅行助手</h2>
-          <span class="status-badge" :class="{ active: !isLoading }">
-            <span class="status-dot"></span>
-            {{ isLoading ? '思考中' : '在线' }}
-          </span>
-        </div>
-
-        <div class="header-actions">
-          <button @click="handleNew" class="action-btn glass-btn" title="新对话">
-            <img src="https://unpkg.com/lucide-static@latest/icons/plus-circle.svg" alt="新对话" class="icon" />
-            <span class="btn-label">新对话</span>
+          <button @click="showHistory = !showHistory" class="history-btn" :class="{ active: showHistory }">
+            <img src="https://unpkg.com/lucide-static@latest/icons/history.svg" alt="历史" class="icon" />
           </button>
+          
+          <div class="header-title">
+            <h2>AI 旅行助手</h2>
+          </div>
+
+          <button @click="handleNew" class="new-btn" title="新对话">
+            <img src="https://unpkg.com/lucide-static@latest/icons/plus.svg" alt="新对话" class="icon" />
+          </button>
+
+          <!-- 历史下拉面板 -->
+          <transition name="dropdown">
+            <div v-if="showHistory" class="history-dropdown">
+              <div class="history-header">
+                <span>对话历史</span>
+                <button @click="showHistory = false" class="close-btn">
+                  <img src="https://unpkg.com/lucide-static@latest/icons/x.svg" alt="关闭" class="icon" />
+                </button>
+              </div>
+              <div class="history-list">
+                <div v-if="conversations.length === 0" class="empty-hint">暂无对话历史</div>
+                <div
+                  v-for="c in conversations"
+                  :key="c.id"
+                  class="history-item"
+                  :class="{ active: String(c.id) === currentConversationId }"
+                  @click="handleSwitch(String(c.id))"
+                >
+                  <span class="item-title">{{ c.title }}</span>
+                  <button class="delete-btn" @click.stop="handleDelete(String(c.id))">
+                    <img src="https://unpkg.com/lucide-static@latest/icons/trash-2.svg" alt="删除" class="icon" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </transition>
         </div>
-      </div>
 
         <ChatWindow ref="windowRef" @update:loading="(v) => (isLoading = v)" />
 
-        <ChatInput :disabled="isLoading" placeholder="随便问我什么..." @send-message="onSend" />
+        <ChatInput :disabled="isLoading" placeholder="输入你的问题..." @send-message="onSend" />
       </div>
       
       <!-- 数字人悬浮按钮 -->
@@ -85,7 +92,6 @@
 
 <script lang="ts" setup>
 import { ref, onMounted } from 'vue'
-import ChatSidebar from './ChatSidebar.vue'
 import ChatWindow from './ChatWindow.vue'
 import ChatInput from './ChatInput.vue'
 import DigitalHumanIframe from '@/components/DigitalHumanIframe.vue'
@@ -97,14 +103,13 @@ withDefaults(defineProps<{ embedded?: boolean }>(), {
   embedded: false
 })
 
-const showSidebar = ref(false)
+const showHistory = ref(false)
 const isLoading = ref(false)
 const conversations = ref<Conversation[]>([])
 const currentConversationId = ref<string | null>(null)
 const windowRef = ref<InstanceType<typeof ChatWindow> | null>(null)
 const loginUserStore = useLoginUserStore()
 const showDigitalHuman = ref(false)
-// 移除 digitalHumanKey，使用 URL 参数防止缓存即可，不需要强制重新创建组件
 
 // 加载用户会话列表
 async function loadConversations() {
@@ -175,7 +180,7 @@ async function onSend(payload: string | { message: string }) {
 async function handleSwitch(id: string) {
   console.log('切换会话:', id)
   currentConversationId.value = id
-  showSidebar.value = false
+  showHistory.value = false
 
   // 加载选中会话的历史消息
   if (windowRef.value) {
@@ -256,7 +261,7 @@ function onDigitalHumanLoaded() {
 /* 页面容器 */
 .helper-page {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   height: calc(100vh - 128px);
   min-height: calc(100vh - 128px);
   overflow: hidden;
@@ -269,7 +274,6 @@ function onDigitalHumanLoaded() {
   min-height: 720px;
   border-radius: 24px;
   border: 1px solid var(--color-border);
-  background: #ffffff;
 }
 
 @supports (height: 100dvh) {
@@ -284,27 +288,15 @@ function onDigitalHumanLoaded() {
   }
 }
 
-/* 侧边栏 */
-.sidebar {
-  position: relative;
-  z-index: 10;
-}
-
 /* 聊天卡片 */
 .chat-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  margin: 0 auto;
-  max-width: 1400px;
-  width: calc(100% - 32px);
   height: 100%;
   background: white;
-  border-radius: 16px;
-  box-shadow: none;
   overflow: hidden;
   position: relative;
-  transition: transform 0.2s ease;
 }
 
 /* 卡片内容区 */
@@ -313,46 +305,46 @@ function onDigitalHumanLoaded() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 16px;
   min-height: 0;
 }
 
 /* 头部 */
 .chat-header {
-  padding: 20px 24px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   background: white;
   border-bottom: 1px solid var(--color-border);
-  z-index: 5;
-  position: relative;
   flex-shrink: 0;
+  position: relative;
 }
 
 /* 按钮 */
-.glass-btn {
-  background: #ffffff;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 10px 16px;
+.history-btn,
+.new-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
 }
 
-.glass-btn:hover {
+.history-btn:hover,
+.new-btn:hover {
   background: var(--color-bg-muted);
-  border-color: var(--color-border-strong);
 }
 
-.glass-btn:active {
-  transform: translateY(0);
+.history-btn.active {
+  background: var(--color-bg-muted);
 }
 
-.glass-btn .icon {
+.history-btn .icon,
+.new-btn .icon {
   width: 20px;
   height: 20px;
   filter: brightness(0) saturate(100%) invert(39%) sepia(57%) saturate(2878%) hue-rotate(211deg) brightness(95%) contrast(101%);
@@ -363,92 +355,138 @@ function onDigitalHumanLoaded() {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.title-icon {
-  width: 24px;
-  height: 24px;
-  filter: none;
-  animation: sparkle 2s ease-in-out infinite;
-}
-
-@keyframes sparkle {
-  0%, 100% {
-    transform: rotate(0deg) scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: rotate(180deg) scale(1.1);
-    opacity: 0.8;
-  }
 }
 
 .header-title h2 {
   margin: 0;
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--color-text);
 }
 
-/* 状态徽章 */
-.status-badge {
+/* 历史下拉面板 */
+.history-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 12px;
+  width: 280px;
+  max-height: 400px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.history-header {
+  padding: 12px 16px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border-radius: 20px;
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-  font-size: 12px;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
   font-weight: 600;
-  transition: all 0.3s ease;
+  font-size: 14px;
 }
 
-.status-badge.active {
-  background: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: currentColor;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(0.8);
-  }
-}
-
-/* 头部操作按钮 */
-.header-actions {
+.history-header .close-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.history-header .close-btn:hover {
+  background: var(--color-bg-muted);
+}
+
+.history-header .close-btn .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.history-list .empty-hint {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.history-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
-.action-btn {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
+.history-item:hover {
+  background: var(--color-bg-muted);
 }
 
-.btn-label {
-  display: inline-block;
+.history-item.active {
+  background: var(--color-bg-muted);
 }
 
-@media (max-width: 768px) {
-  .btn-label {
-    display: none;
-  }
+.item-title {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-item .delete-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  opacity: 0;
+}
+
+.history-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.history-item .delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.history-item .delete-btn .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* 下拉动画 */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 /* 数字人悬浮按钮 */

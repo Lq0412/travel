@@ -79,11 +79,7 @@
     <section class="workspace-grid">
       <article class="workspace-panel">
         <div class="panel-head">
-          <div>
-            <p class="panel-kicker">Step 01</p>
-            <h2>先澄清你的真实需求</h2>
-            <p>对话页负责收集目的地、天数、预算和主题，避免直接生成空泛路线。</p>
-          </div>
+          <h2>澄清需求</h2>
         </div>
 
         <div v-if="isLoggedIn" class="panel-body panel-body-embedded">
@@ -101,11 +97,8 @@
 
       <article class="workspace-panel">
         <div class="panel-head">
-          <div>
-            <p class="panel-kicker">Step 02</p>
-            <h2>把候选方案转成真实行程</h2>
-            <p>生成多个备选版本后，支持直接 DIY 编辑并保存到“我的行程”。</p>
-          </div>
+          <span class="step-badge">Step 02</span>
+          <h2>生成行程</h2>
         </div>
 
         <div class="panel-body panel-body-embedded">
@@ -596,14 +589,13 @@ onMounted(async () => {
 .panel-head,
 .rail-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 24px 24px 0;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 24px;
 
   h2,
   h3 {
-    margin: 6px 0 0;
+    margin: 0;
     color: var(--color-text);
   }
 
@@ -611,6 +603,15 @@ onMounted(async () => {
     margin: 8px 0 0;
     color: var(--color-muted);
   }
+}
+
+.step-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--primary-600);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .panel-body {

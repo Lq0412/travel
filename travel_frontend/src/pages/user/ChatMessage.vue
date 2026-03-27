@@ -1,21 +1,5 @@
 <template>
   <div class="chat-message" :class="{ 'user-message': isUser, 'ai-message': !isUser }">
-    <div class="message-avatar">
-      <div class="avatar" :class="{ 'user-avatar': isUser, 'ai-avatar': !isUser }">
-        <img 
-          v-if="isUser"
-          src="https://unpkg.com/lucide-static@latest/icons/user.svg" 
-          alt="用户" 
-          class="avatar-icon"
-        />
-        <img 
-          v-else
-          src="https://unpkg.com/lucide-static@latest/icons/bot.svg" 
-          alt="AI" 
-          class="avatar-icon"
-        />
-      </div>
-    </div>
     <div class="message-content">
       <div class="message-bubble">
         <pre v-if="isUser" class="message-text">{{ message }}</pre>
@@ -23,11 +7,6 @@
           <!-- 思考过程切换按钮 -->
           <div class="debug-toggle" v-if="hasDebugInfo">
             <button @click="showDebug = !showDebug" class="debug-btn">
-              <img 
-                :src="showDebug ? 'https://unpkg.com/lucide-static@latest/icons/eye-off.svg' : 'https://unpkg.com/lucide-static@latest/icons/eye.svg'" 
-                alt="" 
-                class="btn-icon" 
-              />
               <span>{{ showDebug ? '隐藏思考过程' : '显示思考过程' }}</span>
             </button>
           </div>
@@ -36,17 +15,11 @@
           <transition name="expand">
             <div v-if="showDebug && hasDebugInfo" class="debug-panel">
               <div class="debug-section">
-                <div class="section-header">
-                  <img src="https://unpkg.com/lucide-static@latest/icons/brain.svg" alt="" class="section-icon" />
-                  <strong>思考</strong>
-                </div>
+                <strong>思考</strong>
                 <div class="debug-content">{{ parsedData.reasoning }}</div>
               </div>
               <div class="debug-section">
-                <div class="section-header">
-                  <img src="https://unpkg.com/lucide-static@latest/icons/zap.svg" alt="" class="section-icon" />
-                  <strong>行动</strong>
-                </div>
+                <strong>行动</strong>
                 <div class="debug-content">{{ parsedData.action }}</div>
               </div>
             </div>
@@ -170,20 +143,8 @@ export default defineComponent({
 /* 消息容器 */
 .chat-message {
   display: flex;
-  margin-bottom: 24px;
-  padding: 0 20px;
-  animation: slideIn 0.3s ease-out;
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  margin-bottom: 16px;
+  padding: 0 12px;
 }
 
 .user-message {
@@ -194,94 +155,30 @@ export default defineComponent({
   justify-content: flex-start;
 }
 
-/* 头像 */
-.message-avatar {
-  display: flex;
-  align-items: flex-start;
-  margin: 0 12px;
-}
-
-.avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border: 2px solid transparent;
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.user-avatar {
-  background: var(--color-bg-muted);
-  border-color: var(--color-border);
-  box-shadow: none;
-}
-
-.ai-avatar {
-  background: var(--color-bg-muted);
-  border-color: var(--color-border);
-  box-shadow: none;
-}
-
-.avatar-icon {
-  width: 24px;
-  height: 24px;
-  filter: brightness(0) saturate(100%) invert(100%);
-}
-
-.user-message .message-avatar {
-  order: 2;
-}
-
-.user-message .message-content {
-  order: 1;
-  align-items: flex-end;
-}
-
-.ai-message .message-avatar {
-  order: 1;
-}
-
-.ai-message .message-content {
-  order: 2;
-  align-items: flex-start;
-}
-
 /* 消息内容 */
 .message-content {
-  max-width: 70%;
+  max-width: 80%;
   display: flex;
   flex-direction: column;
 }
 
 .message-bubble {
-  padding: 14px 18px;
-  border-radius: 16px;
-  position: relative;
+  padding: 10px 14px;
+  border-radius: 12px;
   word-wrap: break-word;
   word-break: break-word;
-  box-shadow: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .user-message .message-bubble {
-  background: var(--color-bg-muted);
-  color: var(--color-text);
+  background: var(--primary-600);
+  color: #fff;
   border-bottom-right-radius: 4px;
 }
 
 .ai-message .message-bubble {
-  background: #ffffff;
-  border: 1px solid var(--color-border);
+  background: #f5f5f5;
   color: var(--color-text);
   border-bottom-left-radius: 4px;
-}
-
-.ai-message .message-bubble:hover {
-  box-shadow: none;
 }
 
 /* 消息文本 */
@@ -335,94 +232,51 @@ export default defineComponent({
 
 /* 思考过程切换 */
 .debug-toggle {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   display: flex;
   justify-content: flex-end;
 }
 
 .debug-btn {
-  background: var(--color-bg-muted);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
   cursor: pointer;
-  color: var(--color-text);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-  font-weight: 500;
+  color: var(--color-muted);
 }
 
 .debug-btn:hover {
-  background: var(--color-bg-muted);
-}
-
-.debug-btn .btn-icon {
-  width: 14px;
-  height: 14px;
-  filter: brightness(0) saturate(100%) invert(39%) sepia(57%) saturate(2878%) hue-rotate(211deg) brightness(95%) contrast(101%);
+  color: var(--color-text);
 }
 
 /* 思考过程面板 */
 .debug-panel {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-  overflow: hidden;
+  background: #f0f0f0;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
 }
 
 .debug-section {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .debug-section:last-child {
   margin-bottom: 0;
 }
 
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.section-icon {
-  width: 16px;
-  height: 16px;
-  filter: none;
-}
-
-.section-header strong {
+.debug-section strong {
   color: var(--color-text);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
 }
 
 .debug-content {
-  padding-left: 24px;
-  font-size: 14px;
-  line-height: 1.6;
+  padding-left: 8px;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--color-muted);
-}
-
-/* 展开动画 */
-.expand-enter-active,
-.expand-leave-active {
-  transition: all 0.3s ease;
-  max-height: 500px;
-}
-
-.expand-enter-from,
-.expand-leave-to {
-  max-height: 0;
-  opacity: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-bottom: 0;
 }
 
 /* 消息底部 */
@@ -430,22 +284,19 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 6px;
-  padding: 0 4px;
-  gap: 8px;
+  margin-top: 4px;
+  padding: 0 2px;
 }
 
 .message-time {
-  font-size: 12px;
-  color: var(--color-subtle);
-  font-weight: 500;
+  font-size: 11px;
+  color: var(--color-muted);
 }
 
 .message-actions {
   display: flex;
   gap: 4px;
   opacity: 0;
-  transition: opacity 0.3s ease;
 }
 
 .chat-message:hover .message-actions {
@@ -453,16 +304,15 @@ export default defineComponent({
 }
 
 .action-btn {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border: none;
-  background: var(--color-bg-muted);
-  border-radius: 6px;
+  background: transparent;
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.15s ease;
 }
 
 .action-btn:hover {
@@ -472,41 +322,5 @@ export default defineComponent({
 .action-btn .icon {
   width: 14px;
   height: 14px;
-  filter: none;
-}
-
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .chat-message {
-    padding: 0 16px;
-    margin-bottom: 20px;
-  }
-
-  .message-content {
-    max-width: 85%;
-  }
-
-  .avatar {
-    width: 36px;
-    height: 36px;
-  }
-
-  .avatar-icon {
-    width: 20px;
-    height: 20px;
-  }
-
-  .message-bubble {
-    padding: 12px 14px;
-  }
-
-  .message-text,
-  .message-markdown {
-    font-size: 14px;
-  }
-
-  .message-actions {
-    opacity: 1; /* 移动端始终显示 */
-  }
 }
 </style>
