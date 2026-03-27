@@ -1,69 +1,68 @@
 <template>
   <div class="helper-page" :class="{ embedded }">
-    <!-- 聊天卡片 -->
-    <div class="chat-main">
-      <div class="chat-content">
-        <!-- 头部 -->
-        <div class="chat-header">
-          <button @click="showHistory = !showHistory" class="history-btn" :class="{ active: showHistory }">
-            <img src="https://unpkg.com/lucide-static@latest/icons/history.svg" alt="历史" class="icon" />
-          </button>
-          
-          <div class="header-title">
-            <h2>AI 旅行助手</h2>
-          </div>
-
-          <button @click="handleNew" class="new-btn" title="新对话">
-            <img src="https://unpkg.com/lucide-static@latest/icons/plus.svg" alt="新对话" class="icon" />
-          </button>
-
-          <!-- 历史下拉面板 -->
-          <transition name="dropdown">
-            <div v-if="showHistory" class="history-dropdown">
-              <div class="history-header">
-                <span>对话历史</span>
-                <button @click="showHistory = false" class="close-btn">
-                  <img src="https://unpkg.com/lucide-static@latest/icons/x.svg" alt="关闭" class="icon" />
-                </button>
-              </div>
-              <div class="history-list">
-                <div v-if="conversations.length === 0" class="empty-hint">暂无对话历史</div>
-                <div
-                  v-for="c in conversations"
-                  :key="c.id"
-                  class="history-item"
-                  :class="{ active: String(c.id) === currentConversationId }"
-                  @click="handleSwitch(String(c.id))"
-                >
-                  <span class="item-title">{{ c.title }}</span>
-                  <button class="delete-btn" @click.stop="handleDelete(String(c.id))">
-                    <img src="https://unpkg.com/lucide-static@latest/icons/trash-2.svg" alt="删除" class="icon" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </transition>
-        </div>
-
-        <ChatWindow ref="windowRef" @update:loading="(v) => (isLoading = v)" />
-
-        <ChatInput :disabled="isLoading" placeholder="输入你的问题..." @send-message="onSend" />
-      </div>
+    <!-- 头部 -->
+    <div class="chat-header">
+      <button @click="showHistory = !showHistory" class="history-btn" :class="{ active: showHistory }">
+        <img src="https://unpkg.com/lucide-static@latest/icons/history.svg" alt="历史" class="icon" />
+      </button>
       
-      <!-- 数字人悬浮按钮 -->
-      <transition name="scale-fade">
-        <div v-if="!embedded && !showDigitalHuman" class="digital-human-fab">
-          <button 
-            @click="toggleDigitalHuman" 
-            class="fab-button"
-            title="数字人助手"
-          >
-            <img src="https://unpkg.com/lucide-static@latest/icons/bot.svg" alt="数字人" class="icon" />
-            <span class="fab-ripple"></span>
-          </button>
+      <div class="header-title">
+        <h2>AI 旅行助手</h2>
+      </div>
+
+      <button @click="handleNew" class="new-btn" title="新对话">
+        <img src="https://unpkg.com/lucide-static@latest/icons/plus.svg" alt="新对话" class="icon" />
+      </button>
+
+      <!-- 历史下拉面板 -->
+      <transition name="dropdown">
+        <div v-if="showHistory" class="history-dropdown">
+          <div class="history-header">
+            <span>对话历史</span>
+            <button @click="showHistory = false" class="close-btn">
+              <img src="https://unpkg.com/lucide-static@latest/icons/x.svg" alt="关闭" class="icon" />
+            </button>
+          </div>
+          <div class="history-list">
+            <div v-if="conversations.length === 0" class="empty-hint">暂无对话历史</div>
+            <div
+              v-for="c in conversations"
+              :key="c.id"
+              class="history-item"
+              :class="{ active: String(c.id) === currentConversationId }"
+              @click="handleSwitch(String(c.id))"
+            >
+              <span class="item-title">{{ c.title }}</span>
+              <button class="delete-btn" @click.stop="handleDelete(String(c.id))">
+                <img src="https://unpkg.com/lucide-static@latest/icons/trash-2.svg" alt="删除" class="icon" />
+              </button>
+            </div>
+          </div>
         </div>
       </transition>
     </div>
+
+    <!-- 聊天内容区 -->
+    <ChatWindow ref="windowRef" @update:loading="(v) => (isLoading = v)" />
+
+    <!-- 底部输入框 -->
+    <div class="input-wrapper">
+      <ChatInput :disabled="isLoading" placeholder="输入你的问题..." @send-message="onSend" />
+    </div>
+
+    <!-- 数字人悬浮按钮 -->
+    <transition name="scale-fade">
+      <div v-if="!embedded && !showDigitalHuman" class="digital-human-fab">
+        <button 
+          @click="toggleDigitalHuman" 
+          class="fab-button"
+          title="数字人助手"
+        >
+          <img src="https://unpkg.com/lucide-static@latest/icons/bot.svg" alt="数字人" class="icon" />
+          <span class="fab-ripple"></span>
+        </button>
+      </div>
+    </transition>
 
     <!-- 数字人全屏面板 -->
     <transition name="modal-fade">
@@ -91,7 +90,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue'
+import { shallowRef, ref, computed, onMounted } from 'vue'
 import ChatWindow from './ChatWindow.vue'
 import ChatInput from './ChatInput.vue'
 import DigitalHumanIframe from '@/components/DigitalHumanIframe.vue'
@@ -103,13 +102,19 @@ withDefaults(defineProps<{ embedded?: boolean }>(), {
   embedded: false
 })
 
-const showHistory = ref(false)
-const isLoading = ref(false)
+// Use shallowRef for primitive values (Vue best practice)
+const showHistory = shallowRef(false)
+const isLoading = shallowRef(false)
+const showDigitalHuman = shallowRef(false)
+const currentConversationId = shallowRef<string | null>(null)
+
+// Use ref for objects that need deep reactivity
 const conversations = ref<Conversation[]>([])
-const currentConversationId = ref<string | null>(null)
 const windowRef = ref<InstanceType<typeof ChatWindow> | null>(null)
 const loginUserStore = useLoginUserStore()
-const showDigitalHuman = ref(false)
+
+// Computed for derived state
+const historyButtonClass = computed(() => ({ active: showHistory.value }))
 
 // 加载用户会话列表
 async function loadConversations() {
@@ -258,66 +263,36 @@ function onDigitalHumanLoaded() {
 
 
 <style scoped>
-/* 页面容器 */
 .helper-page {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 128px);
-  min-height: calc(100vh - 128px);
-  overflow: hidden;
-  position: relative;
-  background: #ffffff;
-}
-
-.helper-page.embedded {
   height: 100%;
-  min-height: 720px;
-  border-radius: 24px;
-  border: 1px solid var(--color-border);
-}
-
-@supports (height: 100dvh) {
-  .helper-page {
-    height: calc(100dvh - 128px);
-    min-height: calc(100dvh - 128px);
-  }
-
-  .helper-page.embedded {
-    height: 100%;
-    min-height: 720px;
-  }
-}
-
-/* 聊天卡片 */
-.chat-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: white;
   overflow: hidden;
-  position: relative;
+  background: #fff;
 }
 
-/* 卡片内容区 */
-.chat-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
+.helper-page.embedded .chat-header {
+  display: none;
 }
 
-/* 头部 */
 .chat-header {
   padding: 12px 16px;
   display: flex;
   align-items: center;
   gap: 12px;
-  background: white;
+  background: #fff;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
   position: relative;
+}
+
+/* 底部输入框容器 */
+.input-wrapper {
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  padding-bottom: 24px;
+  flex-shrink: 0;
 }
 
 /* 按钮 */
@@ -332,6 +307,8 @@ function onDigitalHumanLoaded() {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
 }
 
 .history-btn:hover,
@@ -368,7 +345,7 @@ function onDigitalHumanLoaded() {
 .history-dropdown {
   position: absolute;
   top: 100%;
-  left: 12px;
+  left: 0;
   width: 280px;
   max-height: 400px;
   background: #fff;
@@ -491,8 +468,8 @@ function onDigitalHumanLoaded() {
 
 /* 数字人悬浮按钮 */
 .digital-human-fab {
-  position: absolute;
-  bottom: 100px;
+  position: fixed;
+  bottom: 32px;
   right: 32px;
   z-index: 1000;
 }
@@ -573,22 +550,20 @@ function onDigitalHumanLoaded() {
 /* 数字人面板 */
 .digital-human-panel {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1000px;
   height: 100%;
-  max-height: 90vh;
+  max-height: 80vh;
   background: #ffffff;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   border-radius: 12px;
   border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  box-shadow: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   overflow: hidden;
 }
 
 .digital-human-header {
-  padding: 24px 32px;
+  padding: 16px 24px;
   border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
@@ -611,8 +586,8 @@ function onDigitalHumanLoaded() {
 
 .digital-human-header h3 {
   margin: 0;
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--color-text);
 }
 
@@ -698,41 +673,45 @@ function onDigitalHumanLoaded() {
     position: relative;
   }
 
-  .sidebar {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 100;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
-  }
-
   .chat-main {
-    margin: 0 auto;
-    width: calc(100% - 32px);
-    border-radius: 12px;
-  }
-
-  .chat-main.sidebar-open {
-    transform: translateX(280px);
+    margin: 0;
+    width: 100%;
+    max-width: 100%;
   }
 
   .chat-header {
-    padding: 16px;
+    padding: 12px 16px;
   }
 
   .header-title h2 {
-    font-size: 16px;
+    font-size: 15px;
+  }
+
+  .history-btn,
+  .new-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .history-dropdown {
+    width: calc(100vw - 32px);
+    max-width: 280px;
+    left: 0;
   }
 
   .digital-human-fab {
-    bottom: 90px;
-    right: 20px;
+    bottom: 20px;
+    right: 16px;
   }
 
   .fab-button {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
+  }
+
+  .fab-button .icon {
+    width: 22px;
+    height: 22px;
   }
 
   .digital-human-overlay {
@@ -740,16 +719,18 @@ function onDigitalHumanLoaded() {
   }
 
   .digital-human-panel {
+    max-width: 100%;
     max-height: 100vh;
+    height: 100vh;
     border-radius: 0;
   }
 
   .digital-human-header {
-    padding: 16px 20px;
+    padding: 12px 16px;
   }
 
   .digital-human-header h3 {
-    font-size: 18px;
+    font-size: 16px;
   }
 }
 </style>

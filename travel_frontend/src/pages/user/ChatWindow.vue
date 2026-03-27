@@ -25,7 +25,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from 'vue'
+import { ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import ChatMessage from './ChatMessage.vue'
@@ -295,10 +295,11 @@ watch(isLoading, (v) => emit('update:loading', !!v), { immediate: true })
 
 <style scoped>
 .chat-window {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
 .messages {

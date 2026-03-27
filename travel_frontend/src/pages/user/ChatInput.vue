@@ -35,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onMounted, shallowRef, ref } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -52,7 +52,7 @@ const emit = defineEmits<{
   (e: 'send-message', value: string): void
 }>()
 
-const inputRef = ref<HTMLTextAreaElement | null>(null)
+const inputRef = shallowRef<HTMLTextAreaElement | null>(null)
 const inputMessage = ref('')
 
 function sendMessage() {
@@ -96,22 +96,24 @@ onMounted(adjustHeight)
 
 <style scoped>
 .chat-input {
-  padding: 12px;
-  background: #fff;
-  border-top: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
+  padding: 12px 16px;
+    background: transparent;
+    border-top: none;
+    flex-shrink: 0;
+  }
 
-.input-container {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  background: #f5f5f5;
-  border-radius: 12px;
-  padding: 8px 12px;
-}
+  .input-container {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    background: #fff;
+    border-radius: 24px;
+    padding: 8px 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--color-border);
+  }
 
-.input-textarea {
+  .input-textarea {
   flex: 1;
   padding: 4px 0;
   border: none;
@@ -140,6 +142,11 @@ onMounted(adjustHeight)
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.send-button:hover:not(:disabled) {
+  background: var(--primary-700);
 }
 
 .send-button:disabled {

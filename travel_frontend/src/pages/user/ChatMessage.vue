@@ -148,7 +148,7 @@ export default defineComponent({
 }
 
 .user-message {
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .ai-message {
@@ -170,15 +170,14 @@ export default defineComponent({
 }
 
 .user-message .message-bubble {
-  background: var(--primary-600);
-  color: #fff;
-  border-bottom-right-radius: 4px;
+  background: #f4f4f4;
+  color: var(--color-text);
 }
 
 .ai-message .message-bubble {
-  background: #f5f5f5;
+  background: transparent;
   color: var(--color-text);
-  border-bottom-left-radius: 4px;
+  padding-left: 0;
 }
 
 /* 消息文本 */

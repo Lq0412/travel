@@ -176,6 +176,8 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .top-layout {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(circle at top left, rgba(59, 110, 220, 0.08), transparent 25%),
     linear-gradient(180deg, #f7faff 0%, #f4f7fb 220px, #f4f7fb 100%);
@@ -310,12 +312,19 @@ onUnmounted(() => {
 }
 
 .main-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 14px 18px 28px;
 }
 
 .main-inner {
   max-width: 1480px;
   margin: 0 auto;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 1100px) {

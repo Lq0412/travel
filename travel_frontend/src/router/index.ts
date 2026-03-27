@@ -69,7 +69,9 @@ const router = createRouter({
     },
     {
       path: '/ai/planner',
-      redirect: '/workspace',
+      name: 'AI 行程规划',
+      component: () => import('@/pages/ai/PlannerPage.vue'),
+      meta: { layout: 'topnav' },
     },
     {
       path: '/user/forum',
