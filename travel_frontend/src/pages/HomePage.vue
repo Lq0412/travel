@@ -17,7 +17,13 @@
         </div>
 
         <div class="hero-visual">
-          <img :src="illustrations.travelMode" alt="旅行插画" class="hero-illustration">
+          <div v-if="heroPhotos[0]" class="hero-image-wrapper">
+            <img :src="photoSrc(heroPhotos[0])" alt="旅行图片" class="hero-image">
+            <div class="hero-credit">
+              <PexelsCredit :image="heroPhotos[0]" compact />
+            </div>
+          </div>
+          <img v-else :src="illustrations.travelMode" alt="旅行插画" class="hero-illustration">
         </div>
       </div>
     </section>
@@ -122,7 +128,7 @@ function photoSrc(image?: API.ContentImageVO | null) {
 
 async function loadVisuals() {
   const [hero, story] = await Promise.all([
-    fetchCollection('travel planning desk', 2),
+    fetchCollection('beautiful travel vacation', 2),
     fetchCollection('travel destination landscape', 3),
   ])
   heroPhotos.value = hero
@@ -188,6 +194,31 @@ onMounted(loadVisuals)
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.hero-image-wrapper {
+  position: relative;
+  width: 100%;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.hero-image {
+  width: 100%;
+  height: 400px;
+  object-fit: cover;
+  display: block;
+}
+
+.hero-credit {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: var(--shadow-sm);
 }
 
 .hero-illustration {
