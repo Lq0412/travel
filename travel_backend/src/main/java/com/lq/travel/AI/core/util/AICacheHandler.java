@@ -79,9 +79,9 @@ public class AICacheHandler {
             return t;
         });
 
-        log.info("✅ Caffeine缓存初始化完成 - maxSize: {}, expireMinutes: {}",
+        log.info("Caffeine缓存初始化完成 - maxSize: {}, expireMinutes: {}",
                 caffeineMaxSize, caffeineExpireMinutes);
-        log.info("✅ 锁续期线程池初始化完成");
+        log.debug("锁续期线程池初始化完成");
     }
 
     /**
@@ -101,7 +101,7 @@ public class AICacheHandler {
      */
     public AIResponse handleWithCache(String cacheKey, Supplier<AIResponse> supplier, String cacheType) {
         if (caffeineCache == null) {
-            log.warn("⚠️ Caffeine缓存未初始化，跳过缓存直接执行");
+            log.warn("Caffeine缓存未初始化，跳过缓存直接执行");
             return supplier.get();
         }
 
@@ -109,14 +109,14 @@ public class AICacheHandler {
         AIResponse cachedResponse = caffeineCache.getIfPresent(cacheKey);
         if (cachedResponse != null) {
             if (isCacheMarker(cachedResponse, "EMPTY")) {
-                log.debug("✅ {}空值缓存命中，Key: {}", cacheType, cacheKey);
+                log.debug("{}空值缓存命中，Key: {}", cacheType, cacheKey);
                 return null;
             }
             if (isCacheMarker(cachedResponse, "ERROR")) {
-                log.debug("🛡️ {}错误缓存命中（防穿透），Key: {}", cacheType, cacheKey);
+                log.debug("{}错误缓存命中（防穿透），Key: {}", cacheType, cacheKey);
                 return cachedResponse;
             }
-            log.debug("✅ {}正常缓存命中，Key: {}", cacheType, cacheKey);
+            log.debug("{}正常缓存命中，Key: {}", cacheType, cacheKey);
             return cachedResponse;
         }
 
@@ -125,16 +125,16 @@ public class AICacheHandler {
         if (redisValue != null) {
             AIResponse response = (AIResponse) redisValue;
             if (isCacheMarker(response, "EMPTY")) {
-                log.debug("✅ Redis空值缓存命中，Key: {}", cacheKey);
+                log.debug("Redis空值缓存命中，Key: {}", cacheKey);
                 caffeineCache.put(cacheKey, response);
                 return null;
             }
             if (isCacheMarker(response, "ERROR")) {
-                log.debug("🛡️ Redis错误缓存命中，Key: {}", cacheKey);
+                log.debug("Redis错误缓存命中，Key: {}", cacheKey);
                 caffeineCache.put(cacheKey, response);
                 return response;
             }
-            log.info("✅ Redis缓存命中，Key: {}", cacheKey);
+            log.debug("Redis缓存命中，Key: {}", cacheKey);
             caffeineCache.put(cacheKey, response);
             return response;
         }
@@ -146,7 +146,7 @@ public class AICacheHandler {
         try {
             boolean lockAcquired = tryAcquireDistributedLock(lockKey, lockValue);
             if (!lockAcquired) {
-                log.warn("⏳ 未获取到锁，等待其他线程完成，Key: {}", cacheKey);
+                log.warn("未获取到锁，等待其他线程完成，Key: {}", cacheKey);
                 return waitForCacheUpdate(cacheKey, supplier);
             }
 
@@ -157,14 +157,14 @@ public class AICacheHandler {
                 // 5. 双重检查缓存（防止并发）
                 Object doubleCheck = redisTemplate.opsForValue().get(cacheKey);
                 if (doubleCheck != null) {
-                    log.info("🔄 双重检查缓存命中，Key: {}", cacheKey);
+                    log.debug("双重检查缓存命中，Key: {}", cacheKey);
                     AIResponse response = (AIResponse) doubleCheck;
                     caffeineCache.put(cacheKey, response);
                     return response;
                 }
 
                 // 6. 执行实际查询
-                log.info("🔍 缓存未命中，执行实际查询，Key: {}", cacheKey);
+                log.debug("缓存未命中，执行实际查询，Key: {}", cacheKey);
                 AIResponse response = supplier.get();
 
                 // 7. 缓存结果
@@ -188,7 +188,7 @@ public class AICacheHandler {
             }
 
         } catch (Exception e) {
-            log.error("❌ 缓存处理异常，Key: {}", cacheKey, e);
+            log.error("缓存处理异常，Key: {}", cacheKey, e);
             return supplier.get();
         }
     }
@@ -224,7 +224,7 @@ public class AICacheHandler {
             );
 
             if (Boolean.TRUE.equals(success)) {
-                log.debug("🔒 获取分布式锁成功，Key: {}", lockKey);
+                log.debug("获取分布式锁成功，Key: {}", lockKey);
                 return true;
             }
 
@@ -237,7 +237,7 @@ public class AICacheHandler {
             }
         }
 
-        log.warn("⏰ 获取分布式锁超时，Key: {}", lockKey);
+        log.warn("获取分布式锁超时，Key: {}", lockKey);
         return false;
     }
 
@@ -249,7 +249,7 @@ public class AICacheHandler {
             String currentValue = (String) redisTemplate.opsForValue().get(lockKey);
             if (lockValue.equals(currentValue)) {
                 redisTemplate.delete(lockKey);
-                log.debug("🔓 释放分布式锁成功，Key: {}", lockKey);
+                log.debug("释放分布式锁成功，Key: {}", lockKey);
             }
         } catch (Exception e) {
             log.error("释放锁异常，Key: {}", lockKey, e);
@@ -265,7 +265,7 @@ public class AICacheHandler {
                 String currentValue = (String) redisTemplate.opsForValue().get(lockKey);
                 if (lockValue.equals(currentValue)) {
                     redisTemplate.expire(lockKey, lockTtlSeconds, TimeUnit.SECONDS);
-                    log.debug("🔄 锁续期成功，Key: {}", lockKey);
+                    log.debug("锁续期成功，Key: {}", lockKey);
                 }
             } catch (Exception e) {
                 log.error("锁续期异常，Key: {}", lockKey, e);
@@ -290,7 +290,7 @@ public class AICacheHandler {
 
             Object cached = redisTemplate.opsForValue().get(cacheKey);
             if (cached != null) {
-                log.info("✅ 等待后获取到缓存，Key: {}", cacheKey);
+                log.debug("等待后获取到缓存，Key: {}", cacheKey);
                 AIResponse response = (AIResponse) cached;
                 if (caffeineCache != null) {
                     caffeineCache.put(cacheKey, response);
@@ -299,7 +299,7 @@ public class AICacheHandler {
             }
         }
 
-        log.warn("⏰ 等待超时，执行降级查询，Key: {}", cacheKey);
+        log.warn("等待超时，执行降级查询，Key: {}", cacheKey);
         return fallback.get();
     }
 
@@ -311,7 +311,7 @@ public class AICacheHandler {
             caffeineCache.put(cacheKey, response);
         }
         redisTemplate.opsForValue().set(cacheKey, response, redisTtlMinutes, TimeUnit.MINUTES);
-        log.info("💾 缓存正常结果，Key: {}, TTL: {}分钟", cacheKey, redisTtlMinutes);
+        log.debug("缓存正常结果，Key: {}, TTL: {}分钟", cacheKey, redisTtlMinutes);
     }
 
     /**
@@ -322,7 +322,7 @@ public class AICacheHandler {
             caffeineCache.put(cacheKey, marker);
         }
         redisTemplate.opsForValue().set(cacheKey, marker, redisEmptyTtlSeconds, TimeUnit.SECONDS);
-        log.info("💾 缓存空值结果（防穿透），Key: {}, TTL: {}秒", cacheKey, redisEmptyTtlSeconds);
+        log.debug("缓存空值结果（防穿透），Key: {}, TTL: {}秒", cacheKey, redisEmptyTtlSeconds);
     }
 
     /**
@@ -333,7 +333,7 @@ public class AICacheHandler {
             caffeineCache.put(cacheKey, marker);
         }
         redisTemplate.opsForValue().set(cacheKey, marker, redisErrorTtlSeconds, TimeUnit.SECONDS);
-        log.info("💾 缓存错误结果（防穿透），Key: {}, TTL: {}秒", cacheKey, redisErrorTtlSeconds);
+        log.debug("缓存错误结果（防穿透），Key: {}, TTL: {}秒", cacheKey, redisErrorTtlSeconds);
     }
 
     /**
@@ -389,12 +389,12 @@ public class AICacheHandler {
             caffeineCache.asMap().keySet().removeIf(key ->
                     key.contains("conversation:" + conversationId)
             );
-            log.info("已清除Caffeine中的对话缓存");
+            log.debug("已清除Caffeine中的对话缓存");
         }
 
         // 清除Redis中的对话缓存（需要扫描键）
         // 注意：生产环境应使用更高效的方式，如使用Set存储conversationId相关的所有key
-        log.info("已清除Redis中的对话缓存: {}", conversationId);
+        log.debug("已清除Redis中的对话缓存: {}", conversationId);
     }
 
     /**
@@ -403,7 +403,7 @@ public class AICacheHandler {
     public void clearAllCache() {
         if (caffeineCache != null) {
             caffeineCache.invalidateAll();
-            log.info("已清除所有Caffeine缓存");
+            log.debug("已清除所有Caffeine缓存");
         }
         // 注意：不直接flushdb，只清除AI相关的缓存
         log.info("已清除所有AI缓存");
@@ -483,7 +483,7 @@ public class AICacheHandler {
                 if (!lockRenewalExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
                     lockRenewalExecutor.shutdownNow();
                 }
-                log.info("✅ 锁续期线程池已优雅关闭");
+                log.info("锁续期线程池已优雅关闭");
             } catch (InterruptedException e) {
                 lockRenewalExecutor.shutdownNow();
                 Thread.currentThread().interrupt();

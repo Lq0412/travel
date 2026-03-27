@@ -5,15 +5,15 @@
       <div class="header-content">
         <h1>AI 旅行助手</h1>
         <p>
-          <span class="step-badge">1. 对话澄清</span>
+          <span class="step-badge">1. 输入需求</span>
           <span class="step-arrow">→</span>
-          <span class="step-badge">2. 生成卡片</span>
+          <span class="step-badge">2. 自动出卡</span>
           <span class="step-arrow">→</span>
-          <span class="step-badge">3. 确认执行</span>
+          <span class="step-badge">3. 保存行程</span>
         </p>
       </div>
       <div class="header-actions">
-        <a-button v-if="isLoggedIn" type="link" @click="goPlanner">结构化编辑</a-button>
+        <a-button v-if="isLoggedIn" type="link" @click="goPlanner">精修草稿</a-button>
         <a-button v-if="isLoggedIn" type="link" @click="goTrips">我的行程</a-button>
         <a-button v-else type="primary" @click="goLogin">登录</a-button>
       </div>
@@ -25,8 +25,8 @@
       <div v-else class="login-prompt">
         <img :src="illustrations.travelMode" alt="travel illustration">
         <div class="prompt-content">
-          <h2>登录后开始规划</h2>
-          <p>登录后即可与AI对话，生成专属行程方案</p>
+          <h2>登录后直接出行程草稿</h2>
+          <p>登录后即可与 AI 对话，自动生成可保存、可编辑的结构化行程</p>
           <a-button type="primary" size="large" @click="goLogin">前往登录</a-button>
         </div>
       </div>

@@ -272,7 +272,7 @@ public class CongHuaTourismAgent extends BaseAgent {
         prompt.append("系统角色: ").append(getDescription()).append("\n");
         
         // 重要：明确告知AI要参考历史对话（历史消息会通过系统的history字段自动传递）
-        prompt.append("\n⚠️ 重要提示：系统会自动传递之前的对话历史作为上下文，请务必参考历史对话中的信息来回答用户的问题。如果用户提到\"刚刚说过\"、\"之前说过\"等，请主动从历史对话中查找相关信息。\n\n");
+        prompt.append("\n重要提示：系统会自动传递之前的对话历史作为上下文，请务必参考历史对话中的信息来回答用户的问题。如果用户提到\"刚刚说过\"、\"之前说过\"等，请主动从历史对话中查找相关信息。\n\n");
         
         // 只在第一步添加问候语
         if (stepNumber == FIRST_STEP) {
@@ -330,7 +330,7 @@ public class CongHuaTourismAgent extends BaseAgent {
         }
         
         // 使用统一的身份标识
-        String identityMark = "🏞️";
+        String identityMark = "从化旅游助手：";
         
         // 避免重复添加标识
         if (content.startsWith(identityMark)) {
@@ -608,7 +608,7 @@ public class CongHuaTourismAgent extends BaseAgent {
         try {
             // 1. 分析用户意图
             IntentType intent = IntentAnalyzer.analyze(request.getTask());
-            log.info("🎯 用户意图识别: {} - {}", intent, intent.getDescription());
+            log.info("用户意图识别: {} - {}", intent, intent.getDescription());
             
             // 2. 根据意图选择系统提示词
             String systemPrompt = getSystemPromptByIntent(intent);
@@ -636,7 +636,7 @@ public class CongHuaTourismAgent extends BaseAgent {
             }
             
         } catch (Exception e) {
-            log.error("❌ 执行智能流式调用失败", e);
+            log.error("执行智能流式调用失败", e);
             callback.onError(e);
         }
     }

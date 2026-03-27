@@ -42,7 +42,7 @@ public class QuotaServiceImpl implements QuotaService {
     @Override
     public boolean checkQuota(Long userId) {
         if (userId == null) {
-            log.warn("⚠️ userId为空，拒绝请求");
+            log.warn("userId为空，拒绝请求");
             return false;
         }
         
@@ -50,11 +50,11 @@ public class QuotaServiceImpl implements QuotaService {
         try {
             User user = userService.getById(userId);
             if (user != null && "admin".equals(user.getUserRole())) {
-                log.info("✅ 管理员用户 {} 无配额限制，直接通过", userId);
+                log.info("管理员用户 {} 无配额限制，直接通过", userId);
                 return true;
             }
         } catch (Exception e) {
-            log.error("❌ 获取用户信息失败，继续配额检查: {}", e.getMessage());
+            log.error("获取用户信息失败，继续配额检查: {}", e.getMessage());
         }
         
         String key = QUOTA_KEY_PREFIX + userId;
@@ -69,7 +69,7 @@ public class QuotaServiceImpl implements QuotaService {
         
         boolean hasQuota = remaining > 0;
         if (!hasQuota) {
-            log.warn("⚠️ 用户 {} 配额不足，剩余: {}", userId, remaining);
+            log.warn("用户 {} 配额不足，剩余: {}", userId, remaining);
         }
         
         return hasQuota;
@@ -112,7 +112,7 @@ public class QuotaServiceImpl implements QuotaService {
         String key = QUOTA_KEY_PREFIX + userId;
         redisTemplate.opsForValue().set(key, quota, 24, TimeUnit.HOURS);
         
-        log.info("✅ 已重置用户 {} 的配额为: {}", userId, quota);
+        log.info("已重置用户 {} 的配额为: {}", userId, quota);
     }
     
     @Override
@@ -124,7 +124,7 @@ public class QuotaServiceImpl implements QuotaService {
         String key = QUOTA_KEY_PREFIX + userId;
         Long newQuota = redisTemplate.opsForValue().increment(key, tokens);
         
-        log.info("✅ 用户 {} 充值 {} tokens，当前配额: {}", userId, tokens, newQuota);
+        log.info("用户 {} 充值 {} tokens，当前配额: {}", userId, tokens, newQuota);
     }
     
     /**
@@ -144,12 +144,12 @@ public class QuotaServiceImpl implements QuotaService {
      */
     @Scheduled(cron = "0 0 0 * * ?")
     public void resetDailyQuota() {
-        log.info("🔄 开始执行每日配额重置任务");
+        log.info("开始执行每日配额重置任务");
         
         // 注意：这里不直接删除所有键，因为Redis的配额会自动过期
         // 新的请求会自动初始化配额
         
-        log.info("✅ 每日配额重置任务完成（自动过期机制）");
+        log.info("每日配额重置任务完成（自动过期机制）");
     }
 }
 

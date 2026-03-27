@@ -183,8 +183,7 @@ public class TripController {
      * 生成默认标题
      */
     private String generateDefaultTitle(TripVO trip) {
-        String emoji = "✈️"; // 默认emoji
-        return trip.getDestination() + " " + trip.getDays() + "天 " + emoji;
+        return trip.getDestination() + " " + trip.getDays() + "天旅行";
     }
     
     /**
@@ -192,11 +191,11 @@ public class TripController {
      */
     private String generateDefaultContent(TripVO trip, com.lq.travel.model.vo.MemoryCardVO memoryCard) {
         StringBuilder content = new StringBuilder();
-        content.append("📍 目的地：").append(trip.getDestination()).append("\n\n");
-        content.append("⏰ 时间：").append(trip.getDays()).append("天\n\n");
+        content.append("目的地：").append(trip.getDestination()).append("\n\n");
+        content.append("时间：").append(trip.getDays()).append("天\n\n");
         
         if (trip.getDailyHighlights() != null && !trip.getDailyHighlights().isEmpty()) {
-            content.append("✨ 行程亮点：\n");
+            content.append("行程亮点：\n");
             int count = 0;
             for (List<String> highlights : trip.getDailyHighlights().values()) {
                 if (count >= 3) break;
@@ -209,9 +208,9 @@ public class TripController {
             content.append("\n");
         }
         
-        content.append("📸 回忆图：\n");
+        content.append("回忆图：\n");
         content.append("使用AI生成的旅行回忆卡片，记录这次美好的旅程！\n\n");
-        content.append("💡 Tips：\n");
+        content.append("Tips：\n");
         content.append("• 建议提前预订酒店和景点门票\n");
         content.append("• 注意天气变化，准备合适的衣物\n");
         content.append("• 保持手机电量充足，记录美好瞬间");

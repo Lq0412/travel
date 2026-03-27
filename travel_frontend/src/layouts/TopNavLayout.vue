@@ -187,7 +187,7 @@ onUnmounted(() => {
   position: sticky;
   top: 0;
   z-index: 30;
-  padding: 14px 18px;
+  padding: 14px 20px;
   transition: background-color 0.2s ease, box-shadow 0.2s ease, backdrop-filter 0.2s ease;
 
   &.scrolled {
@@ -198,7 +198,7 @@ onUnmounted(() => {
 }
 
 .top-inner {
-  max-width: 1480px;
+  max-width: 1320px;
   margin: 0 auto;
   display: grid;
   grid-template-columns: auto 1fr auto auto;
@@ -288,7 +288,7 @@ onUnmounted(() => {
 }
 
 .mobile-menu {
-  max-width: 1480px;
+  max-width: 1320px;
   margin: 12px auto 0;
   padding: 16px;
   border-radius: 20px;
@@ -315,11 +315,11 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 14px 18px 28px;
+  padding: 14px 20px 28px;
 }
 
 .main-inner {
-  max-width: 1480px;
+  max-width: 1320px;
   margin: 0 auto;
   width: 100%;
   flex: 1;

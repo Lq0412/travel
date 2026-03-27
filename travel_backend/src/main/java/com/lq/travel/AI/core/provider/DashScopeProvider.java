@@ -62,12 +62,12 @@ public class DashScopeProvider implements AIProvider {
      */
     @PostConstruct
     public void initApiKey() {
-        log.info("初始化DashScopeProvider，API密钥: {}, 默认模型: {}", 
+        log.debug("初始化DashScopeProvider，API密钥: {}, 默认模型: {}", 
                 apiKey != null ? "已配置" : "未配置", defaultModel);
         
         if (apiKey != null && !apiKey.trim().isEmpty()) {
             Constants.apiKey = apiKey;
-            log.info("通义千问API密钥已设置");
+            log.debug("通义千问API密钥已设置");
         } else {
             log.error("通义千问API密钥未配置");
         }
@@ -81,7 +81,7 @@ public class DashScopeProvider implements AIProvider {
     @Override
     public boolean isAvailable() {
         boolean available = apiKey != null && !apiKey.trim().isEmpty();
-        log.info("DashScope提供商可用性检查: {}, API密钥: {}, 默认模型: {}, 超时: {}秒, 最大重试: {}次", 
+        log.debug("DashScope提供商可用性检查: {}, API密钥: {}, 默认模型: {}, 超时: {}秒, 最大重试: {}次", 
                 available, apiKey != null ? "已配置" : "未配置", defaultModel, timeoutSeconds, maxRetries);
         return available;
     }
@@ -102,7 +102,7 @@ public class DashScopeProvider implements AIProvider {
                 return AIResponse.error("模型参数不能为空", getProviderName());
             }
             
-            log.info("发送请求到通义千问，请求模型: {}, 默认模型: {}, 使用模型: {}, 消息长度: {}", 
+                log.debug("发送请求到通义千问，请求模型: {}, 默认模型: {}, 使用模型: {}, 消息长度: {}", 
                     request.getModel(), defaultModel, modelToUse, request.getMessage().length());
             
             // 4. 构建消息列表（包含系统提示词、历史消息、当前消息）
@@ -131,7 +131,7 @@ public class DashScopeProvider implements AIProvider {
                     return AIResponse.error("通义千问返回空内容", getProviderName());
                 }
                 
-                log.info("通义千问调用成功，模型: {}, 响应时间: {}ms, Token使用: {}", 
+                log.debug("通义千问调用成功，模型: {}, 响应时间: {}ms, Token使用: {}", 
                         modelToUse, responseTime, 
                         result.getUsage() != null ? result.getUsage().getTotalTokens() : "未知");
                 
@@ -185,7 +185,7 @@ public class DashScopeProvider implements AIProvider {
                 List<Message> messages = buildDashScopeMessages(request);
                 String modelToUse = request.getModel() != null ? request.getModel() : defaultModel;
                 
-                log.info("开始流式调用通义千问，模型: {}, 消息长度: {}", modelToUse, request.getMessage().length());
+                log.debug("开始流式调用通义千问，模型: {}, 消息长度: {}", modelToUse, request.getMessage().length());
                 
                 // 构建请求参数，启用增量输出
                 GenerationParam param = GenerationParam.builder()
@@ -227,7 +227,7 @@ public class DashScopeProvider implements AIProvider {
                                     
                                     // 当 finishReason 不为 null 时，表示是最后一个 chunk
                                     if (finishReason != null && !"null".equals(finishReason)) {
-                                        log.info("通义千问流式调用完成，模型: {}, 输入Tokens: {}, 输出Tokens: {}, 总Tokens: {}", 
+                                        log.debug("通义千问流式调用完成，模型: {}, 输入Tokens: {}, 输出Tokens: {}, 总Tokens: {}", 
                                                 modelToUse,
                                                 message.getUsage() != null ? message.getUsage().getInputTokens() : 0,
                                                 message.getUsage() != null ? message.getUsage().getOutputTokens() : 0,
@@ -259,7 +259,7 @@ public class DashScopeProvider implements AIProvider {
                         },
                         // onComplete: 完成回调（如果没有在onNext中调用）
                         () -> {
-                            log.info("通义千问流式调用自然完成，模型: {}", modelToUse);
+                            log.debug("通义千问流式调用自然完成，模型: {}", modelToUse);
                             // 使用原子变量确保只完成一次
                             if (completed.compareAndSet(false, true)) {
                                 callback.onComplete();

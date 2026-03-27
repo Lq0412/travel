@@ -26,24 +26,24 @@ public class RegexPatterns {
     
     /**
      * 文本清理模式
-     * 用于移除结构化标签（思考、行动、观察、推理）及其前缀emoji
+     * 用于移除结构化标签（思考、行动、观察、推理）及其前缀
      * 适用于数字人对话等需要纯净文本的场景
      */
     public static final Pattern CLEAN_TEXT = Pattern.compile(
-        "(?i)(🧠|⚡|💭)?\\s*(思考|行动|观察|推理)[:：\\-]\\s*"
+        "(?i)\\s*(思考|行动|观察|推理)[:：\\-]\\s*"
     );
     
     /**
-     * Emoji前缀模式
-     * 用于移除单独的emoji前缀
+    * 标签前缀模式
+    * 用于移除身份前缀
      */
-    public static final Pattern EMOJI_PREFIX = Pattern.compile("^[🧠⚡💭🏞️]\\s*");
+    public static final Pattern EMOJI_PREFIX = Pattern.compile("^\\s*(从化旅游助手[:：]?\\s*)?");
     
     /**
-     * 身份标识模式
-     * 用于移除从化旅游助手的身份标识
+    * 身份标识模式
+    * 用于移除从化旅游助手的身份标识
      */
-    public static final Pattern IDENTITY_MARK = Pattern.compile("^🏞️\\s*(从化旅游助手)?\\s*");
+    public static final Pattern IDENTITY_MARK = Pattern.compile("^\\s*(从化旅游助手[:：]?\\s*)");
     
     /**
      * 多余空格模式

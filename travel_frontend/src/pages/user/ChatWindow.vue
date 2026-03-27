@@ -50,7 +50,12 @@ const loginUserStore = useLoginUserStore()
 const router = useRouter()
 
 // 暴露控制函数给父组件
-async function start(task: string, conversationId?: string, onConversationCreated?: (conversationId: string) => void) {
+async function start(
+  task: string,
+  conversationId?: string,
+  onConversationCreated?: (conversationId: string) => void,
+  conversationTitle?: string
+) {
   // 将回调传递给 startStream，以便在创建新对话时通知父组件
   await startStream(
     task, 
@@ -60,7 +65,8 @@ async function start(task: string, conversationId?: string, onConversationCreate
     (data: StructuredItinerary) => {
       console.log('📋 接收到行程数据:', data)
       emit('itinerary-generated', data)
-    }
+    },
+    conversationTitle
   )
 }
 function close() {

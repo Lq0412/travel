@@ -8,6 +8,7 @@ import com.lq.travel.AI.core.model.entity.AIMessage;
 import com.lq.travel.AI.core.service.AIService;
 import com.lq.travel.AI.core.service.AIMessageService;
 import com.lq.travel.AI.core.util.AICacheHandler;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +43,7 @@ public class AIServiceImpl implements AIService {
     /**
      * 初始化提供商映射
      */
-    @Autowired
+    @PostConstruct
     public void initProviders() {
         for (AIProvider provider : providers) {
             providerMap.put(provider.getProviderName(), provider);
@@ -52,10 +53,10 @@ public class AIServiceImpl implements AIService {
 
     @Override
     public AIResponse chat(AIRequest request) {
-        log.info("🚀 调用chat(AIRequest)方法 - 无对话ID");
+        log.debug("调用chat(AIRequest)方法 - 无对话ID");
         // 生成缓存键
         String cacheKey = cacheHandler.generateCacheKey(request, null);
-        log.info("无对话ID的缓存键: {}", cacheKey);
+        log.debug("无对话ID的缓存键: {}", cacheKey);
 
         return cacheHandler.handleWithCache(cacheKey, () -> {
             AIProvider provider = getProvider(defaultProviderName);
@@ -68,11 +69,11 @@ public class AIServiceImpl implements AIService {
 
     @Override
     public AIResponse chat(AIRequest request, Long conversationId) {
-        log.info("🚀 开始处理AI聊天请求 - 消息: {}", request.getMessage());
+        log.debug("开始处理AI聊天请求 - 消息长度: {}", request.getMessage() == null ? 0 : request.getMessage().length());
 
         // 生成缓存键
         String cacheKey = cacheHandler.generateCacheKey(request, conversationId);
-        log.info("🔑 生成缓存键: {}", cacheKey);
+        log.debug("生成缓存键: {}", cacheKey);
 
         return cacheHandler.handleWithCache(cacheKey, () -> {
             AIProvider provider = getProvider(defaultProviderName);
@@ -103,7 +104,7 @@ public class AIServiceImpl implements AIService {
                 
                 if (!history.isEmpty()) {
                     request.setHistory(history);
-                    log.info("加载了 {} 条历史消息作为上下文", history.size());
+                    log.debug("加载了 {} 条历史消息作为上下文", history.size());
                 }
             }
 
@@ -190,18 +191,18 @@ public class AIServiceImpl implements AIService {
             
             if (!history.isEmpty()) {
                 request.setHistory(history);
-                log.info("✅ 成功加载了 {} 条历史消息作为上下文", history.size());
+                log.debug("成功加载了 {} 条历史消息作为上下文", history.size());
                 // 打印最近几条历史消息的内容（用于调试）
-                log.info("📝 最近{}条历史消息预览:", Math.min(3, history.size()));
+                log.debug("最近{}条历史消息预览:", Math.min(3, history.size()));
                 int displayCount = Math.min(3, history.size());
                 for (int i = history.size() - displayCount; i < history.size(); i++) {
                     AIRequest.Message msg = history.get(i);
                     String content = msg.getContent();
                     String preview = content.length() > 50 ? content.substring(0, 50) + "..." : content;
-                    log.info("  [{}] {}", msg.getRole(), preview);
+                    log.debug("  [{}] {}", msg.getRole(), preview);
                 }
             } else {
-                log.warn("⚠️ 没有历史消息，这是对话的开始。如果这是连续对话，请确保使用同一个conversationId！");
+                log.debug("没有历史消息，这是对话的开始。conversationId={}", conversationId);
             }
         }
 
@@ -252,11 +253,12 @@ public class AIServiceImpl implements AIService {
 
     @Override
     public AIResponse chatWithProvider(String providerName, AIRequest request) {
-        log.info("🚀 开始处理AI聊天请求(指定提供商) - 提供商: {}, 消息: {}", providerName, request.getMessage());
+        log.debug("开始处理AI聊天请求(指定提供商) - 提供商: {}, 消息长度: {}", providerName,
+            request.getMessage() == null ? 0 : request.getMessage().length());
 
         // 生成缓存键
         String cacheKey = cacheHandler.generateCacheKey(request, null);
-        log.info("指定提供商无对话ID的缓存键: {}", cacheKey);
+        log.debug("指定提供商无对话ID的缓存键: {}", cacheKey);
 
         return cacheHandler.handleWithCache(cacheKey, () -> {
             AIProvider provider = getProvider(providerName);
@@ -269,11 +271,12 @@ public class AIServiceImpl implements AIService {
 
     @Override
     public AIResponse chatWithProvider(String providerName, AIRequest request, Long conversationId) {
-        log.info("🚀 开始处理AI聊天请求(指定提供商) - 提供商: {}, 消息: {}", providerName, request.getMessage());
+        log.debug("开始处理AI聊天请求(指定提供商) - 提供商: {}, 消息长度: {}", providerName,
+            request.getMessage() == null ? 0 : request.getMessage().length());
 
         // 生成缓存键
         String cacheKey = cacheHandler.generateCacheKey(request, conversationId);
-        log.info("🔑 生成缓存键: {}", cacheKey);
+        log.debug("生成缓存键: {}", cacheKey);
 
         return cacheHandler.handleWithCache(cacheKey, () -> {
             AIProvider provider = getProvider(providerName);
@@ -304,7 +307,7 @@ public class AIServiceImpl implements AIService {
                 
                 if (!history.isEmpty()) {
                     request.setHistory(history);
-                    log.info("加载了 {} 条历史消息作为上下文", history.size());
+                    log.debug("加载了 {} 条历史消息作为上下文", history.size());
                 }
             }
 

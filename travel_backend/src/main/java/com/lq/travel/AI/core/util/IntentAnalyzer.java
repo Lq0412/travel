@@ -14,10 +14,12 @@ public class IntentAnalyzer {
     
     // 行程规划关键词模式
     private static final Pattern ITINERARY_PATTERN = Pattern.compile(
-        ".*(帮我|给我|想要|需要).*(规划|安排|制定|设计).*(行程|计划|路线)|" +
+        ".*(帮我|给我|想要|需要|请帮|麻烦).*(规划|安排|制定|设计|生成|做一份|出一份).*(行程|计划|路线|方案)|" +
+        ".*(生成|规划|安排|制定|设计).*(行程|计划|路线|方案)|" +
         ".*(几天|\\d+天|\\d+日).*(游|旅游|旅行)|" +
         ".*怎么玩.*|" +
-        ".*(行程|路线).*(推荐|建议).*"
+        ".*(行程|路线|方案).*(推荐|建议).*|" +
+        ".*(帮我做|做一份|出一份).*(行程|路线|方案).*"
     );
     
     // 景点查询关键词模式
@@ -42,18 +44,18 @@ public class IntentAnalyzer {
         
         // 优先匹配行程规划（更具体的意图）
         if (ITINERARY_PATTERN.matcher(input).find()) {
-            log.info("✅ 识别为行程规划意图: {}", userInput);
+            log.info("识别为行程规划意图: {}", userInput);
             return IntentType.ITINERARY_GENERATION;
         }
         
         // 其次匹配景点查询
         if (ATTRACTION_PATTERN.matcher(input).find()) {
-            log.info("✅ 识别为景点查询意图: {}", userInput);
+            log.info("识别为景点查询意图: {}", userInput);
             return IntentType.ATTRACTION_QUERY;
         }
         
         // 默认通用聊天
-        log.info("✅ 识别为通用聊天意图: {}", userInput);
+        log.info("识别为通用聊天意图: {}", userInput);
         return IntentType.GENERAL_CHAT;
     }
     

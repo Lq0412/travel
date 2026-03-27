@@ -284,7 +284,7 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements Tr
         // 保存完整的结构化数据
         if (request.getStructuredData() != null && !request.getStructuredData().trim().isEmpty()) {
             trip.setStructuredData(request.getStructuredData());
-            log.info("✅ 保存完整结构化数据，长度: {} 字符", request.getStructuredData().length());
+            log.info("保存完整结构化数据，长度: {} 字符", request.getStructuredData().length());
         }
         
         // 保存行程

@@ -41,7 +41,7 @@ public class ApiRateLimitAspect {
             });
         } catch (RequestNotPermitted e) {
             // 限流触发
-            log.warn("⚠️ 限流触发 - 限流器: {}, 方法: {}", 
+                log.warn("限流触发 - 限流器: {}, 方法: {}", 
                     rateLimiterName, joinPoint.getSignature().getName());
             throw e;
         }

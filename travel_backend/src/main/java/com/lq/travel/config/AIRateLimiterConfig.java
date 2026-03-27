@@ -38,7 +38,7 @@ public class AIRateLimiterConfig {
                 .build();
         
         RateLimiter rateLimiter = registry.rateLimiter("aiChat", config);
-        log.info("✅ AI聊天限流器初始化完成 - 限制: 10次/分钟");
+        log.info("AI聊天限流器初始化完成 - 限制: 10次/分钟");
         return rateLimiter;
     }
     
@@ -56,7 +56,7 @@ public class AIRateLimiterConfig {
                 .build();
         
         RateLimiter rateLimiter = registry.rateLimiter("aiStream", config);
-        log.info("✅ AI流式限流器初始化完成 - 限制: 5次/分钟");
+        log.info("AI流式限流器初始化完成 - 限制: 5次/分钟");
         return rateLimiter;
     }
     
@@ -74,7 +74,7 @@ public class AIRateLimiterConfig {
                 .build();
         
         RateLimiter rateLimiter = registry.rateLimiter("aiAgent", config);
-        log.info("✅ AI代理限流器初始化完成 - 限制: 3次/分钟");
+        log.info("AI代理限流器初始化完成 - 限制: 3次/分钟");
         return rateLimiter;
     }
 }

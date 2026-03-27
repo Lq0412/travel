@@ -19,15 +19,7 @@
 @REM ----------------------------------------------------------------------------
 
 @REM ----------------------------------------------------------------------------
-<<<<<<< HEAD
-<<<<<<< HEAD
-@REM Apache Maven Wrapper startup batch script, version 3.3.3
-=======
 @REM Apache Maven Wrapper startup batch script, version 3.3.4
->>>>>>> f5733f1245ea9e02fb92be6cef7aa16a5d02fcd0
-=======
-@REM Apache Maven Wrapper startup batch script, version 3.3.4
->>>>>>> f5733f1245ea9e02fb92be6cef7aa16a5d02fcd0
 @REM
 @REM Optional ENV vars
 @REM   MVNW_REPOURL - repo url base for downloading maven distribution

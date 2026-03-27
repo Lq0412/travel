@@ -13,6 +13,7 @@ import com.lq.travel.AI.core.service.AIMessageService;
 import com.lq.travel.AI.core.service.QuotaService;
 import com.lq.travel.AI.core.interfaces.StreamCallback;
 import com.lq.travel.AI.core.agent.impl.CongHuaTourismAgent;
+import com.lq.travel.AI.core.agent.impl.GenericTravelAgent;
 import com.lq.travel.annotation.AuthCheck;
 import com.lq.travel.model.entity.User;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
@@ -33,7 +34,7 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * AI控制器
- * 提供AI聊天和从化旅游代理流式调用接口
+ * 提供AI聊天和旅游代理流式调用接口
  */
 @RestController
 @RequestMapping("/ai")
@@ -91,7 +92,7 @@ public class AIController {
             
         } catch (RequestNotPermitted e) {
             // 限流触发
-            log.warn("⚠️ AI聊天接口限流触发");
+            log.warn("AI聊天接口限流触发");
             return ResponseEntity.ok(ResponseDTO.error("请求过于频繁，请1分钟后再试"));
         } catch (Exception e) {
             log.error("AI聊天失败", e);
@@ -100,7 +101,7 @@ public class AIController {
     }
 
     /**
-     * 从化旅游助手流式接口
+     * 通用旅行助手流式接口
      * 需要用户登录 + 限流保护 + 配额检查
      */
     @GetMapping(value = "/tourism/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE + ";charset=UTF-8")
@@ -161,7 +162,7 @@ public class AIController {
         // 异步执行，避免阻塞
         CompletableFuture.runAsync(() -> {
             try {
-                log.info("用户 {} 发起从化旅游代理流式请求: {}, 对话ID: {}", 
+                log.info("用户 {} 发起通用旅行代理流式请求: {}, 对话ID: {}", 
                         finalLoginUser.getId(), task, conversationId);
 
                 if (conversationId != null) {
@@ -171,7 +172,7 @@ public class AIController {
 
                 emitter.send(SseEmitter.event()
                         .name("start")
-                        .data("🏞️ 从化旅游助手开始为您规划行程..."));
+                    .data("通用旅行助手开始为您规划行程..."));
 
                 AgentRequest agentRequest = AgentRequest.builder()
                         .task(task)
@@ -181,9 +182,9 @@ public class AIController {
                         .maxSteps(AIModelConfig.MAX_STEPS_TOURISM)
                     .build();
             
-                // 获取Agent并使用新的智能意图识别方法
-                com.lq.travel.AI.core.interfaces.Agent agent = agentService.getAgent("conghua-tourism");
-                if (agent instanceof CongHuaTourismAgent tourismAgent) {
+                // 获取通用旅行Agent并使用智能意图识别
+                com.lq.travel.AI.core.interfaces.Agent agent = agentService.getAgent("generic-travel");
+                if (agent instanceof GenericTravelAgent tourismAgent) {
                     tourismAgent.executeStreamWithIntent(agentRequest, conversationId, new StreamCallback() {
                         private final StringBuilder full = new StringBuilder();
                         private final long startTime = System.currentTimeMillis();
@@ -223,9 +224,9 @@ public class AIController {
                                     .data(finalResult));
                         emitter.send(SseEmitter.event()
                                 .name("complete")
-                                    .data("从化旅游代理执行完成"));
+                                    .data("通用旅行代理执行完成"));
                         emitter.complete();
-                            log.info("从化旅游代理流式调用完成");
+                            log.info("通用旅行代理流式调用完成");
                     } catch (IOException e) {
                         log.error("发送完成事件失败", e);
                         emitter.completeWithError(e);
@@ -251,10 +252,12 @@ public class AIController {
                     }
                 }
             });
+                } else {
+                    throw new IllegalStateException("通用旅行代理不可用");
                 }
             
             } catch (Exception e) {
-                log.error("从化旅游代理流式调用失败", e);
+                log.error("通用旅行代理流式调用失败", e);
                 try {
                     emitter.send(SseEmitter.event()
                             .name("error")

@@ -31,7 +31,7 @@ public class EnhancedStreamCallbackAdapter implements StreamCallback {
         if (data.contains("```json") || data.contains("```JSON")) {
             inJsonBlock = true;
             jsonBuffer.setLength(0);
-            log.debug("🔍 检测到JSON块开始");
+            log.debug("检测到JSON块开始");
         }
         
         if (inJsonBlock) {
@@ -52,9 +52,9 @@ public class EnhancedStreamCallbackAdapter implements StreamCallback {
                             delegate.onData(json);
                             delegate.onData("\n__STRUCTURED_DATA_END__\n");
                             structuredDataSent = true;
-                            log.info("📦 已发送结构化数据，长度: {} 字符", json.length());
+                            log.info("已发送结构化数据，长度: {} 字符", json.length());
                         } catch (Exception e) {
-                            log.error("❌ 发送结构化数据失败", e);
+                            log.error("发送结构化数据失败", e);
                         }
                     }
                 }
@@ -76,23 +76,23 @@ public class EnhancedStreamCallbackAdapter implements StreamCallback {
                     delegate.onData(json);
                     delegate.onData("\n__STRUCTURED_DATA_END__\n");
                     structuredDataSent = true;
-                    log.info("📦 从完整响应中提取并发送结构化数据，长度: {} 字符", json.length());
+                    log.info("从完整响应中提取并发送结构化数据，长度: {} 字符", json.length());
                 } catch (Exception e) {
-                    log.error("❌ 发送结构化数据失败", e);
+                    log.error("发送结构化数据失败", e);
                 }
             } else {
-                log.warn("⚠️ 流式响应完成，但未能提取到有效的JSON数据");
+                log.warn("流式响应完成，但未能提取到有效的JSON数据");
             }
         }
         
-        log.info("✅ 流式响应完成 - 意图: {}, 总长度: {} 字符, 已发送结构化数据: {}", 
+        log.info("流式响应完成 - 意图: {}, 总长度: {} 字符, 已发送结构化数据: {}", 
                 intent.getDescription(), fullResponse.length(), structuredDataSent);
         delegate.onComplete();
     }
     
     @Override
     public void onError(Exception error) {
-        log.error("❌ 流式响应错误 - 意图: {}", intent.getDescription(), error);
+        log.error("流式响应错误 - 意图: {}", intent.getDescription(), error);
         delegate.onError(error);
     }
     
@@ -115,16 +115,16 @@ public class EnhancedStreamCallbackAdapter implements StreamCallback {
                 String json = cleaned.substring(start, end + 1);
                 // 简单验证JSON格式（检查是否包含行程相关字段）
                 if (json.contains("\"destination\"") || json.contains("\"dailyPlans\"")) {
-                    log.debug("✅ 成功提取JSON，长度: {} 字符", json.length());
+                    log.debug("成功提取JSON，长度: {} 字符", json.length());
                     return json;
                 } else {
-                    log.warn("⚠️ 提取的JSON不包含必要字段");
+                    log.warn("提取的JSON不包含必要字段");
                 }
             } else {
-                log.warn("⚠️ 未找到有效的JSON边界");
+                log.warn("未找到有效的JSON边界");
             }
         } catch (Exception e) {
-            log.warn("⚠️ 提取JSON失败", e);
+            log.warn("提取JSON失败", e);
         }
         return "";
     }
@@ -180,14 +180,14 @@ public class EnhancedStreamCallbackAdapter implements StreamCallback {
                 
                 if (lastValidEnd != -1) {
                     String json = fullText.substring(currentPos, lastValidEnd + 1);
-                    log.debug("✅ 从完整文本中提取JSON，长度: {} 字符", json.length());
+                    log.debug("从完整文本中提取JSON，长度: {} 字符", json.length());
                     return json;
                 }
             }
             
-            log.warn("⚠️ 从完整文本中未找到有效的JSON");
+            log.warn("从完整文本中未找到有效的JSON");
         } catch (Exception e) {
-            log.error("❌ 从完整文本提取JSON失败", e);
+            log.error("从完整文本提取JSON失败", e);
         }
         return "";
     }

@@ -110,7 +110,8 @@ export function useChatStream() {
     conversationId: string | undefined, 
     onScroll: (smooth?: boolean) => void,
     onConversationCreated?: (conversationId: string) => void,
-    onStructuredData?: (data: StructuredItinerary) => void
+    onStructuredData?: (data: StructuredItinerary) => void,
+    conversationTitle?: string
   ) => {
     try { eventSource.value?.close() } catch {}
     eventSource.value = null
@@ -140,9 +141,10 @@ export function useChatStream() {
         // 保持 userId 为字符串格式，避免大整数精度丢失
         const userIdStr = String(userId)
         
+        const titleSource = conversationTitle?.trim() || task
         const response = await createConversation({
           userId: userIdStr as any, // 保持为字符串，避免精度丢失
-          title: task.length > 20 ? task.substring(0, 20) + '...' : task,
+          title: titleSource.length > 20 ? titleSource.substring(0, 20) + '...' : titleSource,
           provider: 'dashscope',
           model: 'qwen-turbo'
         } as any)

@@ -41,7 +41,7 @@ public class AIConfigurationValidator {
 
     @EventListener(ApplicationReadyEvent.class)
     public void validateConfiguration() {
-        log.info("开始验证AI配置...");
+        log.debug("开始验证AI配置...");
         
         // 验证API密钥
         if (dashScopeApiKey == null || dashScopeApiKey.trim().isEmpty()) {
@@ -49,7 +49,7 @@ public class AIConfigurationValidator {
         } else if (!dashScopeApiKey.startsWith("sk-")) {
             log.warn("通义千问API密钥格式可能不正确，通常以'sk-'开头");
         } else {
-            log.info("通义千问API密钥配置正确");
+            log.debug("通义千问API密钥配置正确");
         }
         
         // 验证模型配置
@@ -65,37 +65,37 @@ public class AIConfigurationValidator {
         if (!validModel) {
             log.warn("默认模型 '{}' 可能不是有效的通义千问模型", defaultModel);
         } else {
-            log.info("默认模型配置正确: {}", defaultModel);
+            log.debug("默认模型配置正确: {}", defaultModel);
         }
         
         // 验证温度参数
         if (temperature < 0.0 || temperature > 2.0) {
             log.warn("温度参数 {} 超出推荐范围 [0.0, 2.0]", temperature);
         } else {
-            log.info("温度参数配置正确: {}", temperature);
+            log.debug("温度参数配置正确: {}", temperature);
         }
         
         // 验证最大token数
         if (maxTokens < 1 || maxTokens > 10000) {
             log.warn("最大token数 {} 超出推荐范围 [1, 10000]", maxTokens);
         } else {
-            log.info("最大token数配置正确: {}", maxTokens);
+            log.debug("最大token数配置正确: {}", maxTokens);
         }
         
         // 验证超时配置
         if (timeout < 10 || timeout > 600) {
             log.warn("超时时间 {} 秒超出推荐范围 [10, 600]", timeout);
         } else {
-            log.info("超时时间配置正确: {} 秒", timeout);
+            log.debug("超时时间配置正确: {} 秒", timeout);
         }
         
         // 验证重试次数
         if (maxRetries < 0 || maxRetries > 10) {
             log.warn("最大重试次数 {} 超出推荐范围 [0, 10]", maxRetries);
         } else {
-            log.info("最大重试次数配置正确: {}", maxRetries);
+            log.debug("最大重试次数配置正确: {}", maxRetries);
         }
-        
+
         log.info("AI配置验证完成");
     }
 }

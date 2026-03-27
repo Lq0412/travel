@@ -42,12 +42,28 @@
       </transition>
     </div>
 
+    <div class="quick-actions">
+      <button
+        v-for="prompt in quickPrompts"
+        :key="prompt"
+        class="quick-chip"
+        type="button"
+        @click="handleQuickPrompt(prompt)"
+      >
+        {{ prompt }}
+      </button>
+    </div>
+
     <!-- 聊天内容区 -->
     <ChatWindow ref="windowRef" @update:loading="(v) => (isLoading = v)" />
 
     <!-- 底部输入框 -->
     <div class="input-wrapper">
-      <ChatInput :disabled="isLoading" placeholder="输入你的问题..." @send-message="onSend" />
+      <ChatInput
+        :disabled="isLoading"
+        placeholder="输入一句需求，AI 会自动生成结构化行程卡片"
+        @send-message="onSend"
+      />
     </div>
 
     <!-- 数字人悬浮按钮 -->
@@ -113,6 +129,12 @@ const conversations = ref<Conversation[]>([])
 const windowRef = ref<InstanceType<typeof ChatWindow> | null>(null)
 const loginUserStore = useLoginUserStore()
 
+const quickPrompts = [
+  '帮我生成一个3天2晚的周末行程',
+  '按预算帮我规划一个城市自由行路线',
+  '给我一份适合情侣出游的结构化行程'
+]
+
 // Computed for derived state
 const historyButtonClass = computed(() => ({ active: showHistory.value }))
 
@@ -170,7 +192,7 @@ async function onSend(payload: string | { message: string }) {
   windowRef.value?.addUserMessage(message)
   // 然后启动流式，如果创建了新对话，更新 currentConversationId
   await windowRef.value?.start(
-    message, 
+    buildAssistantTask(message), 
     currentConversationId.value ?? undefined,
     (newConversationId: string) => {
       // 当创建新对话时，保存 conversationId 以便后续消息使用同一个会话
@@ -178,7 +200,8 @@ async function onSend(payload: string | { message: string }) {
       currentConversationId.value = newConversationId
       // 刷新会话列表以显示新对话
       loadConversations()
-    }
+    },
+    message
   )
 }
 
@@ -191,6 +214,23 @@ async function handleSwitch(id: string) {
   if (windowRef.value) {
     await windowRef.value.loadConversationHistory(id)
   }
+}
+
+function handleQuickPrompt(prompt: string) {
+  onSend(prompt)
+}
+
+function isItineraryRequest(text: string) {
+  return /((帮我|给我|想要|需要|请帮|麻烦).*(规划|安排|制定|设计|生成|做一份|出一份).*(行程|计划|路线|方案))|((生成|规划|安排|制定|设计).*(行程|计划|路线|方案))|((几天|\d+天|\d+日).*(游|旅游|旅行))|(怎么玩)|(行程|路线|方案).*(推荐|建议)|(帮我做|做一份|出一份).*(行程|路线|方案)/.test(text)
+}
+
+function buildAssistantTask(message: string) {
+  const trimmed = message.trim()
+  if (!isItineraryRequest(trimmed)) {
+    return trimmed
+  }
+
+  return `${trimmed}\n\n【生成要求】如果这是旅行规划请求，请直接输出可保存的结构化行程草稿，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。`
 }
 
 async function handleDelete(id: string | number) {
@@ -284,6 +324,34 @@ function onDigitalHumanLoaded() {
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
   position: relative;
+}
+
+.quick-actions {
+  width: 100%;
+  max-width: 800px;
+  margin: 12px auto 0;
+  padding: 0 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.quick-chip {
+  border: 1px solid var(--color-border);
+  background: linear-gradient(135deg, rgba(18, 96, 255, 0.08), rgba(0, 180, 216, 0.08));
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.quick-chip:hover {
+  border-color: var(--primary-500);
+  color: var(--primary-500);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(18, 96, 255, 0.12);
 }
 
 /* 底部输入框容器 */

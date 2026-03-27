@@ -2,6 +2,7 @@ package com.lq.travel.AI.core.config;
 
 import com.lq.travel.AI.core.agent.impl.ReActAgent;
 import com.lq.travel.AI.core.agent.impl.CongHuaTourismAgent;
+import com.lq.travel.AI.core.agent.impl.GenericTravelAgent;
 import com.lq.travel.AI.core.service.AIService;
 import com.lq.travel.AI.core.service.AgentService;
 import com.lq.travel.AI.core.service.KnowledgeService;
@@ -57,18 +58,23 @@ public class AIConfiguration implements CommandLineRunner {
         // 注入知识库服务（如果可用）
         if (knowledgeService != null) {
             tourismAgent.setKnowledgeService(knowledgeService);
-            log.info("✅ 知识库服务已注入到从化旅游代理");
+            log.debug("知识库服务已注入到从化旅游代理");
         } else {
-            log.warn("⚠️ 知识库服务未启用，将使用默认知识库");
+            log.warn("知识库服务未启用，将使用默认知识库");
         }
         
         // 注入消息服务（如果可用）
         if (messageService != null) {
             tourismAgent.setMessageService(messageService);
-            log.info("✅ 消息服务已注入到从化旅游代理");
+            log.debug("消息服务已注入到从化旅游代理");
         }
         
         agentService.registerAgent("conghua-tourism", tourismAgent);
+
+        // 新增独立通用旅行代理（不依赖数字人）
+        GenericTravelAgent genericTravelAgent = new GenericTravelAgent("generic-travel", aiService);
+        agentService.registerAgent("generic-travel", genericTravelAgent);
+        log.debug("通用旅行代理已注册: generic-travel");
         
         // 可以在这里注册更多代理
         // ToolCallAgent toolAgent = new ToolCallAgent("tool", aiService);
