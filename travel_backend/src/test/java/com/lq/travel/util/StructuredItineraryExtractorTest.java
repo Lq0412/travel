@@ -47,7 +47,7 @@ class StructuredItineraryExtractorTest {
         assertTrue(normalized.get().contains("\"time\":\"morning\""));
         assertTrue(normalized.get().contains("\"type\":\"attraction\""));
         assertTrue(normalized.get().contains("\"totalEstimatedCost\":30"));
-        assertTrue(normalized.get().contains("\"location\":{\"address\":\"东京都台东区浅草2-3-1\"}"));
+        assertTrue(normalized.get().contains("\"location\":{\"address\":\"东京都台东区浅草2-3-1\""));
     }
 
     @Test
@@ -140,5 +140,41 @@ class StructuredItineraryExtractorTest {
         assertTrue(normalized.get().contains("\"dailyPlans\""));
         assertTrue(normalized.get().contains("\"name\":\"大唐不夜城\""));
         assertTrue(normalized.get().contains("\"tips\":[\"建议夜间保暖\"]"));
+    }
+
+    @Test
+    void shouldPreserveLongitudeLatitudeInLocation() {
+        String modelText = """
+                {
+                  "destination": "上海",
+                  "days": 1,
+                  "dailyPlans": [
+                    {
+                      "day": 1,
+                      "activities": [
+                        {
+                          "time": "morning",
+                          "name": "外滩",
+                          "type": "attraction",
+                          "description": "黄浦江沿岸经典景观",
+                          "location": {
+                            "address": "中山东一路",
+                            "longitude": "121.4903",
+                            "latitude": "31.2417"
+                          },
+                          "estimatedCost": 0
+                        }
+                      ]
+                    }
+                  ]
+                }
+                """;
+
+        Optional<String> normalized = StructuredItineraryExtractor.extractAndNormalize(modelText);
+
+        assertTrue(normalized.isPresent());
+        assertTrue(normalized.get().contains("\"longitude\":121.4903"));
+        assertTrue(normalized.get().contains("\"latitude\":31.2417"));
+        assertTrue(normalized.get().contains("\"coordinates\":[121.4903,31.2417]"));
     }
 }

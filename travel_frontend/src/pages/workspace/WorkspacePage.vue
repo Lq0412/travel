@@ -585,7 +585,8 @@ onUnmounted(() => {
     min-height: 320px;
   }
   .map-panel {
-    display: none; /* 在小屏幕上隐藏地图，避免过分拥挤 */
+    display: flex;
+    min-height: 280px;
   }
 }
 

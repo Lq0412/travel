@@ -1,5 +1,10 @@
 <template>
-  <div class="dynamic-map-container" ref="mapContainer"></div>
+  <div class="dynamic-map-shell">
+    <div class="dynamic-map-container" ref="mapContainer"></div>
+    <div v-if="showNoDataHint" class="map-empty-hint">
+      当前行程没有可用坐标，地图先展示底图。继续发送一次行程请求后会自动打点。
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -24,6 +29,7 @@ const props = defineProps<{
 }>()
 
 const mapContainer = ref<HTMLElement | null>(null)
+const showNoDataHint = ref(false)
 let mapInstance: L.Map | null = null
 let markerGroup: L.LayerGroup | null = null
 let polylineLayer: L.Polyline | null = null
@@ -35,7 +41,7 @@ onMounted(() => {
   mapInstance = L.map(mapContainer.value).setView([35.86166, 104.195397], 4) // Center of China
 
   // Use AutoNavi (GaoDe) Tile Layer, very fast in China
-  L.tileLayer('http://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', {
+  L.tileLayer('https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', {
     maxZoom: 18,
     attribution: '© GaoDe Map'
   }).addTo(mapInstance)
@@ -67,6 +73,7 @@ watch(() => props.itinerary, (newItinerary) => {
 function drawItinerary(itinerary: StructuredItinerary | null) {
   if (!mapInstance || !markerGroup) return
   
+  showNoDataHint.value = false
   markerGroup.clearLayers()
   if (polylineLayer) {
     mapInstance.removeLayer(polylineLayer)
@@ -83,14 +90,15 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
     if (!plan.activities) continue
 
     for (const activity of plan.activities) {
-        // Find latitude and longitude with string-to-number fallback support
-        const rawLon = activity.location?.longitude
-        const rawLat = activity.location?.latitude
+      // Find latitude and longitude with string-to-number fallback support
+      const rawLon = activity.location?.longitude
+      const rawLat = activity.location?.latitude
 
-        const lon = typeof rawLon === 'string' ? parseFloat(rawLon) : rawLon
-        const lat = typeof rawLat === 'string' ? parseFloat(rawLat) : rawLat
+      const lon = typeof rawLon === 'string' ? parseFloat(rawLon) : rawLon
+      const lat = typeof rawLat === 'string' ? parseFloat(rawLat) : rawLat
 
-        if (lon !== undefined && lat !== undefined && !isNaN(lon) && !isNaN(lat)) {
+      if (Number.isFinite(lon) && Number.isFinite(lat)) {
+        const pt: [number, number] = [lat as number, lon as number]
         coords.push(pt)
         
         // Add Marker with Custom CSS animation
@@ -130,11 +138,19 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
       duration: 1.5,
       easeLinearity: 0.25
     })
+  } else {
+    showNoDataHint.value = true
   }
 }
 </script>
 
 <style scoped>
+.dynamic-map-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .dynamic-map-container {
   width: 100%;
   height: 100%;
@@ -145,6 +161,20 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
   box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* slight depth */
   border: 1px solid var(--color-border, #eaeaea);
   z-index: 1; /* Keep leaflet popups below other absolute popups if any */
+}
+
+.map-empty-hint {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 700;
+  background: rgba(10, 19, 40, 0.72);
+  color: #fff;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 /* Fix z-index issue where Leaflet controls overlap higher-level fixed elements */

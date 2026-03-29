@@ -300,7 +300,7 @@ public final class StructuredItineraryExtractor {
                 normalizedActivity.put("imageUrl", imageUrl);
             }
 
-            ObjectNode location = normalizeLocation(activityNode.path("location"), textOf(activityNode, "address", ""));
+            ObjectNode location = normalizeLocation(activityNode.path("location"), activityNode, textOf(activityNode, "address", ""));
             normalizedActivity.set("location", location);
 
             int estimatedCost = Math.max(intOf(activityNode, "estimatedCost", 0), 0);
@@ -345,20 +345,76 @@ public final class StructuredItineraryExtractor {
         return result;
     }
 
-    private static ObjectNode normalizeLocation(JsonNode locationNode, String fallbackAddress) {
+    private static ObjectNode normalizeLocation(JsonNode locationNode, JsonNode activityNode, String fallbackAddress) {
         ObjectNode normalizedLocation = OBJECT_MAPPER.createObjectNode();
 
         String address = fallbackAddress;
+        Double longitude = null;
+        Double latitude = null;
+
         if (locationNode.isObject()) {
             address = firstNonBlank(textOf(locationNode, "address", ""), fallbackAddress);
+
+            longitude = firstNonNull(
+                    doubleOf(locationNode.path("longitude")),
+                    doubleOf(locationNode.path("lng")),
+                    doubleOf(locationNode.path("lon"))
+            );
+            latitude = firstNonNull(
+                    doubleOf(locationNode.path("latitude")),
+                    doubleOf(locationNode.path("lat"))
+            );
+
             JsonNode coordinates = locationNode.path("coordinates");
-            if (coordinates.isArray() && coordinates.size() == 2
-                    && coordinates.get(0).isNumber() && coordinates.get(1).isNumber()) {
-                normalizedLocation.set("coordinates", coordinates.deepCopy());
+            if (coordinates.isArray() && coordinates.size() == 2) {
+                Double coordLon = doubleOf(coordinates.get(0));
+                Double coordLat = doubleOf(coordinates.get(1));
+                if (coordLon != null && coordLat != null) {
+                    if (longitude == null) {
+                        longitude = coordLon;
+                    }
+                    if (latitude == null) {
+                        latitude = coordLat;
+                    }
+                }
             }
         }
 
+        if (activityNode != null && activityNode.isObject()) {
+            if (longitude == null) {
+                longitude = firstNonNull(
+                        doubleOf(activityNode.path("longitude")),
+                        doubleOf(activityNode.path("lng")),
+                        doubleOf(activityNode.path("lon")),
+                        doubleOf(activityNode.path("location.longitude")),
+                        doubleOf(activityNode.path("location.lng"))
+                );
+            }
+
+            if (latitude == null) {
+                latitude = firstNonNull(
+                        doubleOf(activityNode.path("latitude")),
+                        doubleOf(activityNode.path("lat")),
+                        doubleOf(activityNode.path("location.latitude")),
+                        doubleOf(activityNode.path("location.lat"))
+                );
+            }
+
+            address = firstNonBlank(address, textOf(activityNode, "address", ""));
+        }
+
         normalizedLocation.put("address", address == null ? "" : address);
+
+        if (longitude != null && latitude != null) {
+            normalizedLocation.put("longitude", longitude);
+            normalizedLocation.put("latitude", latitude);
+
+            ArrayNode coordinates = OBJECT_MAPPER.createArrayNode();
+            coordinates.add(longitude);
+            coordinates.add(latitude);
+            normalizedLocation.set("coordinates", coordinates);
+        }
+
         return normalizedLocation;
     }
 
@@ -469,6 +525,40 @@ public final class StructuredItineraryExtractor {
         return defaultValue;
     }
 
+    private static Double doubleOf(JsonNode valueNode) {
+        if (valueNode == null || valueNode.isMissingNode() || valueNode.isNull()) {
+            return null;
+        }
+
+        if (valueNode.isNumber()) {
+            return valueNode.asDouble();
+        }
+
+        if (!valueNode.isTextual()) {
+            return null;
+        }
+
+        String text = valueNode.asText();
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+
+        String trimmed = text.trim();
+        try {
+            return Double.parseDouble(trimmed);
+        } catch (NumberFormatException ignore) {
+            String cleaned = trimmed.replaceAll("[^0-9+\\-.]", "");
+            if (cleaned.isBlank() || ".".equals(cleaned) || "-".equals(cleaned) || "+".equals(cleaned)) {
+                return null;
+            }
+            try {
+                return Double.parseDouble(cleaned);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+    }
+
     private static int parseInt(String text, int defaultValue) {
         if (text == null || text.isBlank()) {
             return defaultValue;
@@ -496,6 +586,19 @@ public final class StructuredItineraryExtractor {
             }
         }
         return "";
+    }
+
+    @SafeVarargs
+    private static <T> T firstNonNull(T... values) {
+        if (values == null || values.length == 0) {
+            return null;
+        }
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static JsonNode firstNode(JsonNode node, String... fieldNames) {
