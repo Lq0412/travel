@@ -159,6 +159,8 @@ public class GenericTravelAgent extends BaseAgent {
                     - description: string
                     - imageUrl: string
                     - location.address: string
+                    - location.longitude: number (景点的经度数值)
+                    - location.latitude: number (景点的纬度数值)
                     - estimatedCost: number
                     - tips: string[]
                 - totalEstimatedCost: number
