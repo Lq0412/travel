@@ -7,7 +7,7 @@ const guestUser: API.LoginUserVO = {
   userName: '未登录',
   userAvatar: '',
   userAccount: '',
-  userRole: undefined as any,
+  userRole: undefined,
 }
 
 export const useLoginUserStore = defineStore('loginUser', () => {

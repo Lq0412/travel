@@ -8,7 +8,24 @@ import type { AxiosError } from 'axios'
 interface ApiErrorResponse {
   code?: number
   message?: string
-  data?: any
+  data?: unknown
+}
+
+type ErrorWithResponse = {
+  response?: {
+    status?: number
+    data?: ApiErrorResponse
+  }
+  data?: ApiErrorResponse
+  message?: string
+}
+
+type ValidationErrorField = {
+  errors?: string[]
+}
+
+type ValidationErrorLike = {
+  errorFields?: ValidationErrorField[]
 }
 
 /**
@@ -22,7 +39,7 @@ interface ErrorHandlerOptions {
   /** 是否自动处理401跳转登录，默认true */
   autoRedirectLogin?: boolean
   /** 错误回调函数 */
-  onError?: (error: any) => void
+  onError?: (error: unknown) => void
 }
 
 /**
@@ -32,7 +49,7 @@ interface ErrorHandlerOptions {
  * @returns 错误消息
  */
 export function handleApiError(
-  error: any,
+  error: unknown,
   options: ErrorHandlerOptions = {}
 ): string {
   const {
@@ -44,9 +61,10 @@ export function handleApiError(
 
   let errorMessage = customMessage || '操作失败，请稍后重试'
   let statusCode: number | undefined
+  const errorLike = typeof error === 'object' && error !== null ? (error as ErrorWithResponse) : undefined
 
   // 解析错误信息
-  if (error?.response) {
+  if (errorLike?.response) {
     // Axios错误响应
     const axiosError = error as AxiosError<ApiErrorResponse>
     statusCode = axiosError.response?.status
@@ -57,12 +75,12 @@ export function handleApiError(
     } else if (axiosError.message) {
       errorMessage = axiosError.message
     }
-  } else if (error?.data) {
+  } else if (errorLike?.data) {
     // 直接的响应数据
-    const responseData = error.data as ApiErrorResponse
+    const responseData = errorLike.data
     statusCode = responseData.code
     errorMessage = responseData.message || errorMessage
-  } else if (error?.message) {
+  } else if (error instanceof Error) {
     // 普通错误对象
     errorMessage = error.message
   } else if (typeof error === 'string') {
@@ -107,9 +125,12 @@ export function handleApiError(
  * 处理表单验证错误
  * @param error 验证错误对象
  */
-export function handleValidationError(error: any): void {
-  if (error?.errorFields && Array.isArray(error.errorFields)) {
-    const firstError = error.errorFields[0]
+export function handleValidationError(error: unknown): void {
+  const validationError =
+    typeof error === 'object' && error !== null ? (error as ValidationErrorLike) : undefined
+
+  if (validationError?.errorFields && Array.isArray(validationError.errorFields)) {
+    const firstError = validationError.errorFields[0]
     if (firstError?.errors && firstError.errors.length > 0) {
       message.warning(firstError.errors[0])
     }
@@ -125,7 +146,7 @@ export function handleValidationError(error: any): void {
  * @returns 是否成功（code === 0）
  */
 export function handleBusinessError(
-  response: { code?: number; message?: string; data?: any },
+  response: { code?: number; message?: string; data?: unknown },
   defaultMessage = '操作失败'
 ): boolean {
   if (response.code === 0 || response.code === 200) {
@@ -155,17 +176,17 @@ export function handleBusinessError(
  * @param options 错误处理选项
  * @returns 包装后的函数
  */
-export function withErrorHandler<T extends (...args: any[]) => Promise<any>>(
-  fn: T,
+export function withErrorHandler<TArgs extends unknown[], TResult>(
+  fn: (...args: TArgs) => Promise<TResult>,
   options: ErrorHandlerOptions = {}
-): T {
-  return (async (...args: any[]) => {
+): (...args: TArgs) => Promise<TResult> {
+  return async (...args: TArgs) => {
     try {
       return await fn(...args)
     } catch (error) {
       handleApiError(error, options)
       throw error
     }
-  }) as T
+  }
 }
 

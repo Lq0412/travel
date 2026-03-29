@@ -1,75 +1,25 @@
 import { ref, onBeforeUnmount } from 'vue'
 import type { ChatItem } from '@/types/chat'
 import type { StructuredItinerary } from '@/types/itinerary'
-import { createConversation } from '@/api/conversationController'
+import { createConversationByUserId } from '@/api/chatConversationClient'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
+import {
+  parsePayload,
+  filterAIResponse,
+  extractStructuredData,
+  removeStructuredDataMarkers,
+  hasDebugMarkers as hasChatDebugMarkers,
+} from '@/utils/chatStreamParser'
+
+function isAbortError(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'name' in error && (error as { name?: string }).name === 'AbortError')
+}
 
 export function useChatStream() {
   const messages = ref<ChatItem[]>([])
   const isLoading = ref(false)
   const structuredData = ref<StructuredItinerary | null>(null)
   const abortController = ref<AbortController | null>(null)
-
-  const parsePayload = (raw: string): string => {
-    const s = typeof raw === 'string' ? raw : String(raw ?? '')
-    if (!s) return ''
-    try {
-      const obj = JSON.parse(s)
-      if (obj?.content) return String(obj.content)
-      if (obj?.delta?.content) return String(obj.delta.content)
-      if (Array.isArray(obj?.choices) && obj.choices[0]?.delta?.content) return String(obj.choices[0].delta.content)
-      if (typeof obj?.data === 'string') return obj.data
-      return s
-    } catch {
-      return s
-    }
-  }
-
-  /**
-   * 过滤AI响应，只保留"观察:"后面的内容，隐藏"思考:"和"行动:"部分
-   */
-  const filterAIResponse = (fullText: string): string => {
-    if (!fullText) return ''
-    const observationMatch = fullText.match(/观察[:：]\s*(.+)/s)
-    if (observationMatch) {
-      return observationMatch[1].trim().replace(/^🏞️\s*/g, '')
-    }
-    if (fullText.includes('思考:') || fullText.includes('思考：') || 
-        fullText.includes('行动:') || fullText.includes('行动：')) {
-      return ''
-    }
-    return fullText
-  }
-
-  /**
-   * 从响应文本中提取结构化数据
-   */
-  const extractStructuredData = (text: string): StructuredItinerary | null => {
-    const startMarker = '__STRUCTURED_DATA_START__'
-    const endMarker = '__STRUCTURED_DATA_END__'
-    const startIndex = text.indexOf(startMarker)
-    const endIndex = text.indexOf(endMarker)
-    
-    if (startIndex === -1 || endIndex === -1) return null
-    
-    const jsonStr = text.substring(startIndex + startMarker.length, endIndex).trim()
-    try {
-      return JSON.parse(jsonStr) as StructuredItinerary
-    } catch (e) {
-      console.error('解析结构化数据失败:', e)
-      return null
-    }
-  }
-
-  /**
-   * 移除结构化数据标记，清理显示文本
-   */
-  const removeStructuredDataMarkers = (text: string): string => {
-    return text
-      .replace(/__STRUCTURED_DATA_START__[\s\S]*?__STRUCTURED_DATA_END__/g, '')
-      .replace(/```json[\s\S]*?```/g, '')
-      .trim()
-  }
 
   /**
    * 处理流结束时的最终渲染
@@ -126,12 +76,12 @@ export function useChatStream() {
         }
         
         const titleSource = conversationTitle?.trim() || task
-        const response = await createConversation({
-          userId: String(userId) as any,
+        const response = await createConversationByUserId({
+          userId: String(userId),
           title: titleSource.length > 20 ? titleSource.substring(0, 20) + '...' : titleSource,
           provider: 'dashscope',
           model: 'qwen-turbo'
-        } as any)
+        })
         
         if ((response.data.code === 0 || response.data.code === 200) && response.data.data) {
           finalConversationId = String(response.data.data.id)
@@ -213,15 +163,15 @@ export function useChatStream() {
                   if (text) {
                     fullResponseBuffer += text
                     const filtered = filterAIResponse(fullResponseBuffer)
-                    const hasDebugMarkers = fullResponseBuffer.includes('思考') || fullResponseBuffer.includes('行动')
-                    messages.value[index].text = filtered || (!hasDebugMarkers ? removeStructuredDataMarkers(fullResponseBuffer) : messages.value[index].text)
+                    const hasDebugText = hasChatDebugMarkers(fullResponseBuffer)
+                    messages.value[index].text = filtered || (!hasDebugText ? removeStructuredDataMarkers(fullResponseBuffer) : messages.value[index].text)
                     onScroll(false)
                   }
                 }
               }
             }
-          } catch (error: any) {
-            if (error.name !== 'AbortError') {
+          } catch (error: unknown) {
+            if (!isAbortError(error)) {
               console.error('Stream processing error:', error)
               isLoading.value = false
             }
@@ -229,8 +179,8 @@ export function useChatStream() {
         }
         processStream()
       })
-      .catch(error => {
-        if (error.name !== 'AbortError') {
+      .catch((error: unknown) => {
+        if (!isAbortError(error)) {
           console.error('Fetch error:', error)
           messages.value[index].text += '\n\n❌ 连接失败，请检查网络或重新登录'
         }

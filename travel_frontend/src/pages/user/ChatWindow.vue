@@ -33,8 +33,10 @@ import ItineraryCard from './ItineraryCard.vue'
 import type { StructuredItinerary } from '@/types/itinerary'
 import { useChatStream } from '@/composables/useChatStream'
 import { useAutoScroll } from '@/composables/useAutoScroll'
-import { getConversationMessages } from '@/api/conversationController'
+import { getConversationMessagesById } from '@/api/chatConversationClient'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
+import { extractStructuredData } from '@/utils/chatStreamParser'
+import { mapAIMessageToChatItem } from '@/utils/chatMappers'
 
 withDefaults(defineProps<{ showItineraryCard?: boolean }>(), {
   showItineraryCard: true,
@@ -118,10 +120,7 @@ async function loadConversationHistory(conversationId: string) {
 
     // 注意：虽然类型定义是 number，但我们需要传递字符串以避免大整数精度丢失
     // Spring Boot 会自动将 URL 路径和查询参数中的字符串转换为 Long
-    const response = await getConversationMessages({
-      conversationId: conversationIdStr as any, // 保持为字符串，避免精度丢失
-      userId: userIdStr as any // 保持为字符串，避免精度丢失
-    } as any)
+    const response = await getConversationMessagesById(conversationIdStr, userIdStr)
 
     console.log('📥 历史消息响应:', response.data)
     console.log('响应码:', response.data.code)
@@ -136,18 +135,14 @@ async function loadConversationHistory(conversationId: string) {
       const messageList = Array.isArray(response.data.data) ? response.data.data : []
       console.log('📝 准备加载', messageList.length, '条历史消息')
       
-      messageList.forEach((msg: any) => {
-        const content = msg.content || ''
-        messages.value.push({
-          role: msg.role === 'user' ? 'user' : 'ai',
-          text: content,
-          time: new Date(msg.createTime || Date.now())
-        })
+      messageList.forEach((msg) => {
+        const mappedMessage = mapAIMessageToChatItem(msg)
+        messages.value.push(mappedMessage)
         
         // 检查AI消息中是否包含结构化数据
-        if (msg.role === 'assistant' && content.includes('__STRUCTURED_DATA_START__')) {
+        if (msg.role === 'assistant' && mappedMessage.text.includes('__STRUCTURED_DATA_START__')) {
           console.log('🔍 发现历史消息中的结构化数据')
-          extractAndSetStructuredData(content)
+          extractAndSetStructuredData(mappedMessage.text)
         }
       })
 
@@ -160,9 +155,14 @@ async function loadConversationHistory(conversationId: string) {
       // 即使失败也显示提示
       messages.value = []
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ 加载历史消息时发生错误:', error)
-    console.error('错误详情:', error.response?.data || error.message)
+    const errorDetail =
+      typeof error === 'object' && error !== null && 'response' in error
+        ? (error as { response?: { data?: unknown } }).response?.data
+        : undefined
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('错误详情:', errorDetail || errorMessage)
     // 错误时也清空消息，避免显示错误状态
     messages.value = []
   }
@@ -170,25 +170,16 @@ async function loadConversationHistory(conversationId: string) {
 
 // 从文本中提取并设置结构化数据
 function extractAndSetStructuredData(text: string) {
-  try {
-    const startMarker = '__STRUCTURED_DATA_START__'
-    const endMarker = '__STRUCTURED_DATA_END__'
-    
-    const startIndex = text.indexOf(startMarker)
-    const endIndex = text.indexOf(endMarker)
-    
-    if (startIndex !== -1 && endIndex !== -1) {
-      const jsonStr = text.substring(startIndex + startMarker.length, endIndex).trim()
-      const data = JSON.parse(jsonStr) as StructuredItinerary
-      structuredData.value = data
-      console.log('✅ 成功从历史消息恢复结构化数据:', data)
-      
-      // 通知父组件
-      emit('itinerary-generated', data)
-    }
-  } catch (error) {
-    console.error('❌ 从历史消息提取结构化数据失败:', error)
+  const data = extractStructuredData(text)
+  if (!data) {
+    return
   }
+
+  structuredData.value = data
+  console.log('✅ 成功从历史消息恢复结构化数据:', data)
+
+  // 通知父组件
+  emit('itinerary-generated', data)
 }
 
 // 清空消息
@@ -267,7 +258,7 @@ async function handleSaveItinerary(itinerary: StructuredItinerary) {
     console.log('📋 提取的每日亮点:', dailyHighlights)
     
     // 构建保存请求
-    const saveRequest = {
+    const saveRequest: API.TripSaveRequest = {
       destination: itinerary.destination,
       days: itinerary.days,
       budget: itinerary.budget,
@@ -280,7 +271,7 @@ async function handleSaveItinerary(itinerary: StructuredItinerary) {
     
     console.log('📤 发送保存请求:', saveRequest)
     
-    const response = await saveTrip(saveRequest as any)
+    const response = await saveTrip(saveRequest)
     
     if (response.data.code === 0 && response.data.data) {
       console.log('✅ 保存成功，行程ID:', response.data.data)
@@ -290,9 +281,10 @@ async function handleSaveItinerary(itinerary: StructuredItinerary) {
       console.error('❌ 保存失败:', response.data.message)
       message.error(response.data.message || '保存失败')
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ 保存行程时发生错误:', error)
-    message.error(error.message || '保存失败')
+    const errorMessage = error instanceof Error ? error.message : '保存失败'
+    message.error(errorMessage)
   }
 }
 

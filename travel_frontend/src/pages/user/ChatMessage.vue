@@ -47,7 +47,7 @@
 <script lang="ts">
 import { defineComponent, computed, ref } from 'vue'
 import { marked } from 'marked'
-import { formatChatTime } from '@/util/timeUtils'
+import { formatChatTime } from '@/utils/timeUtils'
 import userAvatar from '@/assets/user-avatar.jpg'
 import aiAvatar from '@/assets/user-avatar.jpg'
 

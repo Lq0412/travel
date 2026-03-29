@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import type { Plugin } from 'vue'
 import { createPinia } from 'pinia'
 
 import Antd from 'ant-design-vue';
@@ -9,8 +10,15 @@ import './access'
 
 const app = createApp(App)
 
+type AntdThemeOptions = {
+  theme: {
+    token: Record<string, string | number>
+  }
+}
+const antdThemePlugin = Antd as Plugin<[AntdThemeOptions]>
+
 // 配置 Ant Design Vue 主题，统一远航蓝视觉系统
-app.use(Antd as any, {
+app.use(antdThemePlugin, {
   theme: {
     token: {
       // 主色系 - Ocean teal
@@ -98,9 +106,9 @@ app.use(Antd as any, {
       motionDurationFast: '150ms'
     }
   }
-});
+})
 
 app.use(createPinia())
 app.use(router)
-app.mount('#app');
+app.mount('#app')
 

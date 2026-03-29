@@ -230,13 +230,12 @@ async function saveProfile() {
 
   saving.value = true
   try {
-    const payload = {
-      id: form.id,
+    const payload: API.UserUpdateMyRequest = {
       userName: form.userName?.trim(),
       userAvatar: form.userAvatar,
       userProfile: form.userProfile,
     }
-    const res = await updateMyUser(payload as any)
+    const res = await updateMyUser(payload)
     if (res.data.code === 0) {
       Object.assign(original, { ...original, ...payload })
       loginUserStore.setLoginUser({ ...loginUserStore.loginUser, ...payload })
@@ -284,8 +283,13 @@ async function handleAvatarChange(event: Event) {
       return
     }
     throw new Error(res.data.message || '上传失败')
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.message || error?.message || '头像上传失败'
+  } catch (error: unknown) {
+    const responseMessage =
+      typeof error === 'object' && error !== null && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined
+    const runtimeMessage = error instanceof Error ? error.message : undefined
+    const errorMsg = responseMessage || runtimeMessage || '头像上传失败'
     message.error(errorMsg)
   } finally {
     avatarUploading.value = false

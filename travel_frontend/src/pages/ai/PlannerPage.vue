@@ -124,7 +124,7 @@
                     <div class="plan-tags">
                       <a-tag v-if="p.theme" color="arc" class="theme-tag"><TagOutlined /> {{ p.theme }}</a-tag>
                       <a-tag v-else color="default" class="theme-tag">通用主题</a-tag>
-                      <a-tag color="orange" v-if="p.budget > 0"><PayCircleOutlined /> {{ formatBudget(p.budget) }}</a-tag>
+                      <a-tag color="orange" v-if="(p.budget ?? 0) > 0"><PayCircleOutlined /> {{ formatBudget(p.budget) }}</a-tag>
                     </div>
                   </div>
                 </div>
@@ -337,9 +337,14 @@ const form = ref<{ destination: string; days: number; budget?: number; theme?: s
   budget: undefined,
   theme: ''
 })
-const plans = ref<any[]>([])
+type PlannerPlan = API.TripPlan & {
+  startDate?: string
+  endDate?: string
+}
+
+const plans = ref<PlannerPlan[]>([])
 const showEditor = ref(false)
-const editingPlan = ref<any | null>(null)
+const editingPlan = ref<PlannerPlan | null>(null)
 const customSaving = ref(false)
 
 type EditorDay = {
@@ -388,7 +393,7 @@ function formatBudget(value?: number | string) {
   return `¥${num.toLocaleString('zh-CN')}`
 }
 
-function getPlanHighlights(plan: any) {
+function getPlanHighlights(plan: PlannerPlan) {
   const result: Array<{ day: number; key: string; items: string[] }> = []
   const highlights = plan?.dailyHighlights
   if (!highlights || typeof highlights !== 'object') {
@@ -449,22 +454,30 @@ async function onGenerate() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
   
   try {
-    const res = await generateTrip({
+    const request: API.TripGenerateRequest = {
       destination: form.value.destination.trim(),
       days: form.value.days,
       budget: form.value.budget,
       theme: form.value.theme?.trim()
-    } as any)
+    }
+
+    const res = await generateTrip(request)
     
-    plans.value = res?.data?.data?.plans || []
+    const generatedPlans = res?.data?.data?.plans || []
+    plans.value = generatedPlans as PlannerPlan[]
     
     if (plans.value.length === 0) {
       errorMessage.value = '暂无生成方案，可以尝试换个目的地或主题重试'
     } else {
       message.success(`太棒了！成功为您生成 ${plans.value.length} 个专属旅行方案`)
     }
-  } catch (e: any) {
-    const errorMsg = e?.response?.data?.message || e?.message || '生成小意外，请稍后再试'
+  } catch (e: unknown) {
+    const responseMessage =
+      typeof e === 'object' && e !== null && 'response' in e
+        ? (e as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined
+    const runtimeMessage = e instanceof Error ? e.message : undefined
+    const errorMsg = responseMessage || runtimeMessage || '生成小意外，请稍后再试'
     errorMessage.value = errorMsg
     message.error(errorMsg)
   } finally {
@@ -472,20 +485,28 @@ async function onGenerate() {
   }
 }
 
-async function onSave(plan: any, overrides?: CustomPlanOverrides) {
+async function onSave(plan: PlannerPlan, overrides?: CustomPlanOverrides) {
+  if (!plan.planId) {
+    message.error('方案缺少 planId，无法保存')
+    return false
+  }
+
   savingId.value = plan.planId
   let success = false
   try {
-    const resp = await saveTrip({
+    const mergedBudget = overrides?.budget ?? plan.budget
+    const request: API.TripSaveRequest = {
       planId: plan.planId,
       destination: overrides?.destination ?? plan.destination,
       days: overrides?.days ?? plan.days,
-      budget: overrides?.budget ?? plan.budget,
+      budget: mergedBudget == null ? undefined : mergedBudget,
       theme: overrides?.theme ?? plan.theme,
       startDate: overrides?.startDate ?? plan.startDate,
       endDate: overrides?.endDate ?? plan.endDate,
       dailyHighlights: overrides?.dailyHighlights ?? plan.dailyHighlights
-    } as any)
+    }
+
+    const resp = await saveTrip(request)
     
     const tripId = resp?.data?.data
     if (tripId) {
@@ -497,8 +518,13 @@ async function onSave(plan: any, overrides?: CustomPlanOverrides) {
     } else {
       throw new Error('未返回行程 ID')
     }
-  } catch (e: any) {
-    const errorMsg = e?.response?.data?.message || e?.message || '保存失败，请稍后重试'
+  } catch (e: unknown) {
+    const responseMessage =
+      typeof e === 'object' && e !== null && 'response' in e
+        ? (e as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined
+    const runtimeMessage = e instanceof Error ? e.message : undefined
+    const errorMsg = responseMessage || runtimeMessage || '保存失败，请稍后重试'
     message.error(errorMsg)
   } finally {
     savingId.value = null
@@ -506,7 +532,7 @@ async function onSave(plan: any, overrides?: CustomPlanOverrides) {
   return success
 }
 
-function openEditor(plan: any) {
+function openEditor(plan: PlannerPlan) {
   if (!plan) return
   editingPlan.value = plan
   editorForm.value = {
@@ -530,7 +556,7 @@ function closeEditor() {
   editorDays.value = []
 }
 
-function buildEditorDays(plan: any): EditorDay[] {
+function buildEditorDays(plan: PlannerPlan): EditorDay[] {
   const highlights = plan?.dailyHighlights
   const days = Number(plan?.days) || 1
   const result: EditorDay[] = []

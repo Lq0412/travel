@@ -10,6 +10,31 @@ export default defineConfig({
     vue(),
     vueDevTools(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) {
+            return
+          }
+
+          if (id.includes('ant-design-vue') || id.includes('@ant-design/icons-vue')) {
+            return 'vendor-antd'
+          }
+
+          if (id.includes('vue-router') || id.includes('pinia') || id.includes('/vue/')) {
+            return 'vendor-vue'
+          }
+
+          if (id.includes('marked')) {
+            return 'vendor-markdown'
+          }
+
+          return 'vendor'
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))

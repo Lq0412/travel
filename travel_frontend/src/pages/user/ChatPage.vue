@@ -81,7 +81,11 @@ import ChatInput from './ChatInput.vue'
 import type { Conversation } from '@/types/chat'
 import type { StructuredItinerary } from '@/types/itinerary'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
-import { getUserConversations, deleteConversation } from '@/api/conversationController'
+import {
+  getUserConversationsByUserId,
+  deleteConversationById,
+} from '@/api/chatConversationClient'
+import { mapConversationVOToConversation } from '@/utils/chatMappers'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), {
   embedded: false
@@ -127,19 +131,12 @@ async function loadConversations() {
     console.log('✅ 用户已登录，开始加载会话列表，用户ID:', loginUserStore.loginUser.id)
     console.log('📡 调用 getUserConversations API...')
 
-    const response = await getUserConversations({
-      userId: loginUserStore.loginUser.id,
-      pageNum: 1,
-      pageSize: 50
-    })
+    const response = await getUserConversationsByUserId(String(loginUserStore.loginUser.id), 1, 50)
 
     console.log('📥 会话列表响应:', response.data)
     if ((response.data.code === 0 || response.data.code === 200) && response.data.data) {
-      conversations.value = response.data.data.map((conv: any) => ({
-        id: String(conv.id),
-        title: conv.title || '新对话',
-        updateTime: conv.updateTime
-      }))
+      const rawConversations = Array.isArray(response.data.data) ? response.data.data : []
+      conversations.value = rawConversations.map(mapConversationVOToConversation)
       console.log('✅ 加载会话列表成功，共', conversations.value.length, '个对话')
       console.log('会话列表数据:', conversations.value)
     } else {
@@ -229,10 +226,7 @@ async function handleDelete(id: string | number) {
       userId: userIdStr
     })
 
-    const response = await deleteConversation({
-      conversationId: conversationIdStr as any, // 保持为字符串，避免精度丢失
-      userId: userIdStr as any // 保持为字符串，避免精度丢失
-    } as any)
+    const response = await deleteConversationById(conversationIdStr, userIdStr)
 
     console.log('删除会话响应:', response.data)
 

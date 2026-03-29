@@ -147,8 +147,13 @@ async function loadTrips() {
   try {
     const resp = await getMyTrips()
     trips.value = resp?.data?.data || []
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.message || error?.message || '加载行程失败'
+  } catch (error: unknown) {
+    const responseMessage =
+      typeof error === 'object' && error !== null && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined
+    const runtimeMessage = error instanceof Error ? error.message : undefined
+    const errorMsg = responseMessage || runtimeMessage || '加载行程失败'
     message.error(errorMsg)
   }
 }

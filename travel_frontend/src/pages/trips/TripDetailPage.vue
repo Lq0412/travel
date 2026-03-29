@@ -197,7 +197,7 @@ async function refreshTrip() {
   }
 
   try {
-    const resp = await getTripById({ id } as any)
+    const resp = await getTripById({ id })
     trip.value = resp?.data?.data || null
     if (trip.value) {
       await loadDestinationPhoto(trip.value.destination)
@@ -205,8 +205,13 @@ async function refreshTrip() {
       destinationPhoto.value = null
       lastDestinationQuery.value = ''
     }
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.message || error?.message || '加载行程失败'
+  } catch (error: unknown) {
+    const responseMessage =
+      typeof error === 'object' && error !== null && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined
+    const runtimeMessage = error instanceof Error ? error.message : undefined
+    const errorMsg = responseMessage || runtimeMessage || '加载行程失败'
     message.error(errorMsg)
   }
 }
@@ -218,11 +223,16 @@ async function markCompleted() {
 
   completing.value = true
   try {
-    await completeTrip({ id: trip.value.id } as any)
+    await completeTrip({ id: Number(trip.value.id) })
     message.success('已标记为已完成')
     await refreshTrip()
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.message || error?.message || '操作失败'
+  } catch (error: unknown) {
+    const responseMessage =
+      typeof error === 'object' && error !== null && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined
+    const runtimeMessage = error instanceof Error ? error.message : undefined
+    const errorMsg = responseMessage || runtimeMessage || '操作失败'
     message.error(errorMsg)
   } finally {
     completing.value = false

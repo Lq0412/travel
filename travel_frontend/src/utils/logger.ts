@@ -84,7 +84,7 @@ class Logger {
   /**
    * DEBUG级别日志（仅开发环境）
    */
-  debug(message: string, ...args: any[]): void {
+  debug(message: string, ...args: unknown[]): void {
     if (!this.shouldLog(LogLevel.DEBUG)) return
     console.log(this.getPrefix(LogLevel.DEBUG), message, ...args)
   }
@@ -92,7 +92,7 @@ class Logger {
   /**
    * INFO级别日志
    */
-  info(message: string, ...args: any[]): void {
+  info(message: string, ...args: unknown[]): void {
     if (!this.shouldLog(LogLevel.INFO)) return
     console.info(this.getPrefix(LogLevel.INFO), message, ...args)
   }
@@ -100,7 +100,7 @@ class Logger {
   /**
    * WARN级别日志
    */
-  warn(message: string, ...args: any[]): void {
+  warn(message: string, ...args: unknown[]): void {
     if (!this.shouldLog(LogLevel.WARN)) return
     console.warn(this.getPrefix(LogLevel.WARN), message, ...args)
   }
@@ -108,15 +108,15 @@ class Logger {
   /**
    * ERROR级别日志（始终记录）
    */
-  error(message: string, error?: any): void {
+  error(message: string, error?: unknown): void {
     if (!this.shouldLog(LogLevel.ERROR)) return
     
     console.error(this.getPrefix(LogLevel.ERROR), message)
     
     if (error) {
       console.error('错误详情:', error)
-      
-      if (this.config.showStack && error?.stack) {
+
+      if (this.config.showStack && error instanceof Error && error.stack) {
         console.error('调用栈:', error.stack)
       }
     }

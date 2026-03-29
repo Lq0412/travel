@@ -151,7 +151,7 @@ async function handleLogout() {
     userName: '未登录',
     userAvatar: '',
     userAccount: '',
-    userRole: undefined as any,
+    userRole: undefined,
   })
   message.success('已退出登录')
   showMobileMenu.value = false

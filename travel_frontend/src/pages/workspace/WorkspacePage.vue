@@ -141,15 +141,24 @@ function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItin
   cloned.dailyPlans = (cloned.dailyPlans || []).map((plan, index) => {
     plan.day = index + 1
     plan.activities = (plan.activities || []).map((activity) => {
-      const raw = activity as any
+      const raw = activity as unknown as {
+        imageUrl?: string
+        image?: string
+        picture?: string
+        address?: string
+      }
+      const fallbackImage = [raw.imageUrl, raw.image, raw.picture].find(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0,
+      )
+      const fallbackAddress = typeof raw.address === 'string' ? raw.address : ''
       return {
         ...activity,
         time: normalizePeriod(activity.time),
         name: activity.name || '',
         description: activity.description || '',
         type: activity.type || 'attraction',
-        imageUrl: activity.imageUrl || raw.imageUrl || raw.image || raw.picture || '',
-        location: activity.location || { address: raw.address || '' },
+        imageUrl: activity.imageUrl || fallbackImage || '',
+        location: activity.location || { address: fallbackAddress },
         estimatedCost: Number(activity.estimatedCost || 0),
       }
     })
