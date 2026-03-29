@@ -253,16 +253,25 @@ function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItin
       )
       const candidateImage = activity.imageUrl || fallbackImage || ''
       const fallbackAddress = typeof raw.address === 'string' ? raw.address : ''
-      return {
-        ...activity,
-        time: normalizePeriod(activity.time),
-        name: activity.name || '',
-        description: activity.description || '',
-        type: activity.type || 'attraction',
-        imageUrl: isUsableImageUrl(candidateImage) ? candidateImage : '',
-        location: activity.location || { address: fallbackAddress },
-        estimatedCost: Number(activity.estimatedCost || 0),
-      }
+        const rawObj = activity as any
+        const lat = rawObj.location?.latitude || rawObj.latitude || rawObj['location.latitude'] || rawObj.lat
+        const lon = rawObj.location?.longitude || rawObj.longitude || rawObj['location.longitude'] || rawObj.lng
+        
+        const normalizedLocation = activity.location || { address: fallbackAddress }
+        if (lat !== undefined && lon !== undefined) {
+           normalizedLocation.latitude = Number(lat)
+           normalizedLocation.longitude = Number(lon)
+        }
+        return {
+          ...activity,
+          time: normalizePeriod(activity.time),
+          name: activity.name || '',
+          description: activity.description || '',
+          type: activity.type || 'attraction',
+          imageUrl: isUsableImageUrl(candidateImage) ? candidateImage : '',
+          location: normalizedLocation,
+          estimatedCost: Number(activity.estimatedCost || 0),
+        }
     })
     return plan
   })
@@ -416,7 +425,7 @@ function buildPlannerPrompt(userInput: string): string {
     themeInstruction = '【偏好要求：大学生特种兵打卡游】必须是高性价比、高密度的行程。包含网红打卡点、高性价比夜市和小吃街，不强制高品质酒店，主打一个高效低预算游玩。'
   }
 
-  const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。dailyPlans.activities 中每个景点必须包含：time（只允许 morning/noon/evening 三种）、name、description、type、location.address、location.longitude(真实的经度)、location.latitude(真实的纬度)、estimatedCost、imageUrl。'
+  const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。dailyPlans.activities 中每个景点必须包含：time（morning/noon/evening）、name、description、type、location（必须是包含 address、longitude小数经度、latitude小数纬度 这三个字段的嵌套对象）、estimatedCost、imageUrl。'
 
   return `${userInput}\n\n${themeInstruction ? themeInstruction + '\n\n' : ''}${baseConstraint}`
 }
@@ -625,3 +634,4 @@ onUnmounted(() => {
   }
 }
 </style>
+
