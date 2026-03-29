@@ -43,15 +43,34 @@ export function filterAIResponse(fullText: string): string {
 
 export function extractStructuredData(text: string): StructuredItinerary | null {
   const startIndex = text.indexOf(STRUCTURED_DATA_START)
-  const endIndex = text.indexOf(STRUCTURED_DATA_END)
+  const endIndex = text.lastIndexOf(STRUCTURED_DATA_END)
 
-  if (startIndex === -1 || endIndex === -1) return null
+  if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex) return null
 
   const jsonStr = text.substring(startIndex + STRUCTURED_DATA_START.length, endIndex).trim()
   try {
     return JSON.parse(jsonStr) as StructuredItinerary
   } catch {
-    return null
+    const repaired = jsonStr
+      .replace(/^\uFEFF/, '')
+      .replace(/,\s*([}\]])/g, '$1')
+      .trim()
+
+    try {
+      return JSON.parse(repaired) as StructuredItinerary
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        const preview = repaired.length > 320 ? `${repaired.slice(0, 320)}...` : repaired
+        console.warn('[chatStreamParser] 结构化数据解析失败', {
+          startIndex,
+          endIndex,
+          length: repaired.length,
+          preview,
+          error,
+        })
+      }
+      return null
+    }
   }
 }
 

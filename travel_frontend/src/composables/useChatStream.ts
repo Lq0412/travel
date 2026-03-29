@@ -20,6 +20,34 @@ export function useChatStream() {
   const isLoading = ref(false)
   const structuredData = ref<StructuredItinerary | null>(null)
   const abortController = ref<AbortController | null>(null)
+  const lastStructuredSignature = ref('')
+
+  const trySetStructuredData = (
+    fullResponseBuffer: string,
+    onStructuredData?: (data: StructuredItinerary) => void,
+  ) => {
+    const structured = extractStructuredData(fullResponseBuffer)
+    if (!structured) {
+      return false
+    }
+
+    const signature = JSON.stringify(structured)
+    if (signature === lastStructuredSignature.value) {
+      return true
+    }
+    lastStructuredSignature.value = signature
+
+    structuredData.value = structured
+    onStructuredData?.(structured)
+    if (import.meta.env.DEV) {
+      console.log('[useChatStream] ✅ 已提取结构化行程', {
+        destination: structured.destination,
+        days: structured.days,
+        dailyPlans: structured.dailyPlans?.length ?? 0,
+      })
+    }
+    return true
+  }
 
   /**
    * 处理流结束时的最终渲染
@@ -30,10 +58,15 @@ export function useChatStream() {
     onScroll: (smooth?: boolean) => void,
     onStructuredData?: (data: StructuredItinerary) => void
   ) => {
-    const structured = extractStructuredData(fullResponseBuffer)
-    if (structured) {
-      structuredData.value = structured
-      onStructuredData?.(structured)
+    const hasStructured = trySetStructuredData(fullResponseBuffer, onStructuredData)
+    if (import.meta.env.DEV && !hasStructured) {
+      console.warn('[useChatStream] ⚠️ 流结束但未提取到结构化行程', {
+        length: fullResponseBuffer.length,
+        hasStartMarker: fullResponseBuffer.includes('__STRUCTURED_DATA_START__'),
+        hasEndMarker: fullResponseBuffer.includes('__STRUCTURED_DATA_END__'),
+      })
+    }
+    if (hasStructured) {
       const cleaned = removeStructuredDataMarkers(messages.value[index].text)
       if (cleaned) messages.value[index].text = cleaned
       onScroll(false)
@@ -55,13 +88,13 @@ export function useChatStream() {
     console.log('📍 startStream 被调用, task:', task.substring(0, 50), 'conversationId:', conversationId)
     abortController.value?.abort()
     structuredData.value = null
+    lastStructuredSignature.value = ''
     isLoading.value = true
 
     const index = messages.value.length
     messages.value.push({ role: 'ai', text: '', time: new Date() })
     
     let fullResponseBuffer = ''
-    let waitingResult = false
 
     // 如果没有对话ID，先创建新对话
     let finalConversationId = conversationId
@@ -121,6 +154,83 @@ export function useChatStream() {
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
+        let currentEvent = 'message'
+        let eventDataLines: string[] = []
+        let streamFinished = false
+
+        const finishStream = () => {
+          if (streamFinished) {
+            return
+          }
+          streamFinished = true
+          handleStreamEnd(index, fullResponseBuffer, onScroll, onStructuredData)
+        }
+
+        const appendAndRender = (text: string, replaceBuffer = false) => {
+          if (!text) {
+            return
+          }
+
+          if (replaceBuffer) {
+            fullResponseBuffer = text
+          } else {
+            fullResponseBuffer += text
+          }
+
+          trySetStructuredData(fullResponseBuffer, onStructuredData)
+
+          const filtered = filterAIResponse(fullResponseBuffer)
+          const hasDebugText = hasChatDebugMarkers(fullResponseBuffer)
+          messages.value[index].text =
+            filtered || (!hasDebugText ? removeStructuredDataMarkers(fullResponseBuffer) : messages.value[index].text)
+          onScroll(false)
+        }
+
+        const dispatchEvent = (): boolean => {
+          const eventType = currentEvent.trim().toLowerCase()
+          const payload = eventDataLines.join('\n')
+          currentEvent = 'message'
+          eventDataLines = []
+
+          if (!eventType && !payload) {
+            return false
+          }
+
+          if (eventType === 'complete' || eventType === 'end' || eventType === 'done') {
+            finishStream()
+            return true
+          }
+
+          if (eventType === 'error') {
+            if (payload) {
+              messages.value[index].text = payload
+            }
+            isLoading.value = false
+            return true
+          }
+
+          if (eventType === 'start') {
+            return false
+          }
+
+          const text = parsePayload(payload)
+          if (!text) {
+            return false
+          }
+
+          if (text === '[DONE]' || text === '流式响应完成' || text === '通用旅行代理执行完成') {
+            finishStream()
+            return true
+          }
+
+          if (eventType === 'result') {
+            appendAndRender(text, true)
+            return false
+          }
+
+          appendAndRender(text)
+          return false
+        }
         
         const processStream = async () => {
           try {
@@ -128,7 +238,10 @@ export function useChatStream() {
               const { done, value } = await reader.read()
               
               if (done) {
-                handleStreamEnd(index, fullResponseBuffer, onScroll, onStructuredData)
+                if (eventDataLines.length > 0) {
+                  dispatchEvent()
+                }
+                finishStream()
                 break
               }
               
@@ -137,36 +250,23 @@ export function useChatStream() {
               buffer = lines.pop() || ''
               
               for (const line of lines) {
-                if (!line.trim()) continue
-                
-                if (line.startsWith('event:')) {
-                  const eventType = line.substring(6).trim()
-                  if (eventType === 'result') waitingResult = true
-                  if (eventType === 'complete' || eventType === 'end' || eventType === 'done') {
-                    handleStreamEnd(index, fullResponseBuffer, onScroll, onStructuredData)
+                const normalizedLine = line.replace(/\r$/, '')
+
+                if (!normalizedLine) {
+                  if (dispatchEvent()) {
                     return
                   }
-                } else if (line.startsWith('data:')) {
-                  const data = line.substring(5).trim()
-                  const text = parsePayload(data)
-                  
-                  if (waitingResult) {
-                    waitingResult = false
-                    fullResponseBuffer = text
-                  }
-                  
-                  if (text === '[DONE]' || text === '流式响应完成') {
-                    handleStreamEnd(index, fullResponseBuffer, onScroll, onStructuredData)
-                    return
-                  }
-                  
-                  if (text) {
-                    fullResponseBuffer += text
-                    const filtered = filterAIResponse(fullResponseBuffer)
-                    const hasDebugText = hasChatDebugMarkers(fullResponseBuffer)
-                    messages.value[index].text = filtered || (!hasDebugText ? removeStructuredDataMarkers(fullResponseBuffer) : messages.value[index].text)
-                    onScroll(false)
-                  }
+                  continue
+                }
+
+                if (normalizedLine.startsWith('event:')) {
+                  currentEvent = normalizedLine.substring(6).trim()
+                  continue
+                }
+
+                if (normalizedLine.startsWith('data:')) {
+                  const rawData = normalizedLine.substring(5)
+                  eventDataLines.push(rawData.startsWith(' ') ? rawData.slice(1) : rawData)
                 }
               }
             }

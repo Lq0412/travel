@@ -77,6 +77,11 @@ public class QuotaServiceImpl implements QuotaService {
             redisTemplate.opsForValue().set(key, DAILY_QUOTA, 24, TimeUnit.HOURS);
             return true;
         }
+
+        if (remaining < 0) {
+            clampQuotaToZero(key);
+            remaining = 0;
+        }
         
         boolean hasQuota = remaining > 0;
         if (!hasQuota) {
@@ -93,12 +98,34 @@ public class QuotaServiceImpl implements QuotaService {
         }
         
         String key = QUOTA_KEY_PREFIX + userId;
-        Long remaining = redisTemplate.opsForValue().decrement(key, tokens);
-        
-        log.info("用户 {} 使用 {} tokens，剩余配额: {}", userId, tokens, remaining);
+
+        Integer currentQuota = redisTemplate.opsForValue().get(key);
+        if (currentQuota == null) {
+            redisTemplate.opsForValue().set(key, DAILY_QUOTA, 24, TimeUnit.HOURS);
+            currentQuota = DAILY_QUOTA;
+        }
+
+        if (currentQuota < 0) {
+            clampQuotaToZero(key);
+            currentQuota = 0;
+        }
+
+        int actualDeduction = Math.min(tokens, currentQuota);
+        if (actualDeduction <= 0) {
+            log.warn("用户 {} 当前配额为 0，本次不再扣减（请求tokens: {}）", userId, tokens);
+            return;
+        }
+
+        Long remaining = redisTemplate.opsForValue().decrement(key, actualDeduction);
+        if (remaining != null && remaining < 0) {
+            clampQuotaToZero(key);
+            remaining = 0L;
+        }
+
+        log.info("用户 {} 使用 {} tokens（请求: {}），剩余配额: {}", userId, actualDeduction, tokens, remaining);
         
         // 记录使用情况（用于统计）
-        recordUsage(userId, tokens);
+        recordUsage(userId, actualDeduction);
     }
     
     @Override
@@ -111,7 +138,16 @@ public class QuotaServiceImpl implements QuotaService {
         Integer remaining = redisTemplate.opsForValue().get(key);
         
         // 如果没有记录，返回每日配额
-        return remaining != null ? remaining : DAILY_QUOTA;
+        if (remaining == null) {
+            return DAILY_QUOTA;
+        }
+
+        if (remaining < 0) {
+            clampQuotaToZero(key);
+            return 0;
+        }
+
+        return remaining;
     }
     
     @Override
@@ -147,6 +183,19 @@ public class QuotaServiceImpl implements QuotaService {
         
         redisTemplate.opsForValue().increment(key, tokens);
         redisTemplate.expire(key, 30, TimeUnit.DAYS);  // 保留30天
+    }
+
+    /**
+     * 将配额纠正到 0，并尽量保留原有过期时间。
+     */
+    private void clampQuotaToZero(String key) {
+        Long ttlSeconds = redisTemplate.getExpire(key, TimeUnit.SECONDS);
+        if (ttlSeconds != null && ttlSeconds > 0) {
+            redisTemplate.opsForValue().set(key, 0, ttlSeconds, TimeUnit.SECONDS);
+            return;
+        }
+
+        redisTemplate.opsForValue().set(key, 0, 24, TimeUnit.HOURS);
     }
     
     /**

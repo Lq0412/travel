@@ -168,6 +168,8 @@ public class GenericTravelAgent extends BaseAgent {
                 - dailyPlans 的天数必须与 days 一致。
                 - 每天 activities 至少 1 条。
                 - 信息不足时，也要先生成可执行草案，并在 tips 中标注待确认项。
+                - JSON 必须是合法 JSON：所有 key/字符串使用双引号，不允许注释，不允许尾随逗号。
+                - 整个回复中只允许出现一个 JSON 对象，不要再输出第二个 JSON。
                 """;
             case ATTRACTION_QUERY -> """
                 你是专业的旅行景点助手，擅长介绍各地景点信息。

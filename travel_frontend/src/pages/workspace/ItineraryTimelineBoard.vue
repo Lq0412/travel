@@ -14,7 +14,12 @@
             <div class="connector"></div>
             <div class="spot-card">
               <div class="spot-image">
-                <img v-if="spot.imageUrl" :src="spot.imageUrl" :alt="spot.name" />
+                <img
+                  v-if="spot.imageUrl && !isImageFailed(spot.imageUrl)"
+                  :src="spot.imageUrl"
+                  :alt="spot.name"
+                  @error="onImageError(spot.imageUrl)"
+                />
                 <span v-else>图片区域</span>
               </div>
               <div class="spot-desc">
@@ -35,8 +40,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { StructuredItinerary } from '@/types/itinerary'
+import { computed, ref } from 'vue'
+import type { Activity, DailyPlan, StructuredItinerary } from '@/types/itinerary'
 
 type DayPeriod = 'morning' | 'noon' | 'evening'
 
@@ -48,9 +53,31 @@ interface TimelineNode {
   imageUrl?: string
 }
 
+type MaybeArray<T> = T[] | null | undefined | unknown
+
 const props = defineProps<{
   itinerary?: StructuredItinerary | null
 }>()
+
+const failedImages = ref<Set<string>>(new Set())
+
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : []
+}
+
+function isImageFailed(imageUrl?: string): boolean {
+  if (!imageUrl) {
+    return false
+  }
+  return failedImages.value.has(imageUrl)
+}
+
+function onImageError(imageUrl?: string) {
+  if (!imageUrl) {
+    return
+  }
+  failedImages.value.add(imageUrl)
+}
 
 function normalizePeriod(raw: string): DayPeriod {
   const value = (raw || '').trim().toLowerCase()
@@ -77,11 +104,23 @@ function periodLabel(period: DayPeriod): string {
 }
 
 const timelineNodes = computed<TimelineNode[]>(() => {
-  const plans = props.itinerary?.dailyPlans || []
+  const plans = ensureArray<DailyPlan>(props.itinerary?.dailyPlans)
   const nodes: TimelineNode[] = []
 
   plans.forEach((plan) => {
-    ;(plan.activities || []).forEach((activity) => {
+    const activities = ensureArray<Activity>((plan as { activities?: unknown }).activities)
+
+    if (activities.length === 0) {
+      nodes.push({
+        day: plan.day,
+        period: 'noon',
+        name: '待补充景点',
+        description: '该天行程已生成，但活动明细为空，可继续在下方对话补充。',
+      })
+      return
+    }
+
+    activities.forEach((activity) => {
       nodes.push({
         day: plan.day,
         period: normalizePeriod(activity.time),
@@ -100,7 +139,7 @@ const timelineNodes = computed<TimelineNode[]>(() => {
 .timeline-board {
   width: 100%;
   height: 100%;
-  min-height: 0;
+  min-height: 360px;
   display: flex;
   flex-direction: column;
   background-color: #f7f9fc;

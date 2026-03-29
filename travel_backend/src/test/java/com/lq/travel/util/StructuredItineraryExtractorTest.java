@@ -60,4 +60,85 @@ class StructuredItineraryExtractorTest {
         Optional<String> normalized = StructuredItineraryExtractor.extractAndNormalize(invalid);
         assertTrue(normalized.isEmpty());
     }
+
+    @Test
+    void shouldHandleLenientJsonWithSingleQuotesAndTrailingCommas() {
+        String modelText = """
+                观察: 我先给你一版可落地草案，后续可以继续微调。
+
+                ```json
+                {
+                  destination: '成都',
+                  days: 2,
+                  budget: '1800',
+                  theme: '休闲逛吃',
+                  dailyPlans: [
+                    {
+                      day: 1,
+                      activities: [
+                        {
+                          time: '10:00-12:00',
+                          title: '宽窄巷子',
+                          type: 'scenic',
+                          description: '老成都慢生活体验',
+                          address: '成都市青羊区',
+                          estimatedCost: '50',
+                        },
+                      ],
+                    },
+                  ],
+                  tips: '建议错峰出行，准备轻便鞋',
+                }
+                ```
+                """;
+
+        Optional<String> normalized = StructuredItineraryExtractor.extractAndNormalize(modelText);
+
+        assertTrue(normalized.isPresent());
+        assertTrue(normalized.get().contains("\"destination\":\"成都\""));
+        assertTrue(normalized.get().contains("\"name\":\"宽窄巷子\""));
+        assertTrue(normalized.get().contains("\"type\":\"attraction\""));
+        assertTrue(normalized.get().contains("\"time\":\"morning\""));
+        assertTrue(normalized.get().contains("\"tips\":[\"建议错峰出行\",\"准备轻便鞋\"]"));
+    }
+
+    @Test
+    void shouldExtractNestedItineraryObject() {
+        String modelText = """
+                观察: 这是你要的精简版规划。
+
+                {
+                  "result": {
+                    "itinerary": {
+                      "destination": "西安",
+                      "days": 1,
+                      "dailyPlans": [
+                        {
+                          "day": 1,
+                          "activities": [
+                            {
+                              "time": "evening",
+                              "name": "大唐不夜城",
+                              "type": "attraction",
+                              "description": "夜游体验",
+                              "address": "雁塔区",
+                              "estimatedCost": 0
+                            }
+                          ]
+                        }
+                      ],
+                      "tips": ["建议夜间保暖"]
+                    }
+                  }
+                }
+                """;
+
+        Optional<String> normalized = StructuredItineraryExtractor.extractAndNormalize(modelText);
+
+        assertTrue(normalized.isPresent());
+        assertTrue(normalized.get().contains("\"destination\":\"西安\""));
+        assertTrue(normalized.get().contains("\"dailyPlans\""));
+        assertTrue(normalized.get().contains("\"name\":\"大唐不夜城\""));
+        assertTrue(normalized.get().contains("\"tips\":[\"建议夜间保暖\"]"));
+    }
 }

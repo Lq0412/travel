@@ -3,6 +3,15 @@
     <header class="page-header">
       <div class="header-actions">
         <a-button v-if="isLoggedIn" type="link" @click="resetConversation">新会话</a-button>
+        <a-button
+          v-if="isLoggedIn && currentItinerary"
+          type="primary"
+          :loading="isSavingTrip"
+          :disabled="isLoading"
+          @click="saveCurrentItinerary"
+        >
+          保存行程
+        </a-button>
         <a-button v-if="isLoggedIn" type="link" @click="goTrips">我的行程</a-button>
         <a-button v-else type="primary" @click="goLogin">登录</a-button>
       </div>
@@ -50,21 +59,27 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import ChatInput from '@/pages/user/ChatInput.vue'
 import ItineraryTimelineBoard from '@/pages/workspace/ItineraryTimelineBoard.vue'
-import type { StructuredItinerary } from '@/types/itinerary'
+import type { Activity, DailyPlan, StructuredItinerary } from '@/types/itinerary'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 import { useVisualContent } from '@/composables/useVisualContent'
 import { useChatStream } from '@/composables/useChatStream'
+import { saveTrip } from '@/api/tripController'
 
 type DayPeriod = 'morning' | 'noon' | 'evening'
 
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
-const { illustrations } = useVisualContent()
+const { illustrations, fetchFirst } = useVisualContent()
 
 const currentItinerary = ref<StructuredItinerary | null>(null)
 const conversationId = ref<string | undefined>(undefined)
+const isSavingTrip = ref(false)
+const enrichmentVersion = ref(0)
+const lastItinerarySignature = ref('')
+const imageQueryCache = new Map<string, string>()
 const baseSuggestions = [
   '给我一版 3 天游轻松路线，早中晚各 1 个景点',
   '把第二天晚上改成夜景和夜市路线',
@@ -92,8 +107,40 @@ watch(structuredData, (data) => {
   if (!data) {
     return
   }
-  currentItinerary.value = normalizeIncomingItinerary(data)
+
+  applyStructuredItinerary(data)
 })
+
+function applyStructuredItinerary(data: StructuredItinerary) {
+  const signature = JSON.stringify(data)
+  if (signature === lastItinerarySignature.value) {
+    return
+  }
+  lastItinerarySignature.value = signature
+
+  if (import.meta.env.DEV) {
+    const activityCount = ensureArray<DailyPlan>(data.dailyPlans).reduce((total, plan) => {
+      const value = plan as { activities?: unknown }
+      return total + ensureArray<Activity>(value.activities).length
+    }, 0)
+    console.log('[WorkspacePage] 接收到结构化行程', {
+      destination: data.destination,
+      days: data.days,
+      dailyPlans: data.dailyPlans?.length ?? 0,
+      activities: activityCount,
+    })
+  }
+
+  const normalized = normalizeIncomingItinerary(data)
+  currentItinerary.value = normalized
+
+  const currentVersion = ++enrichmentVersion.value
+  void enrichItineraryImages(normalized).then((enriched) => {
+    if (enrichmentVersion.value === currentVersion) {
+      currentItinerary.value = enriched
+    }
+  })
+}
 
 function goLogin() {
   router.push('/user/login')
@@ -104,8 +151,37 @@ function goTrips() {
 }
 
 function resetConversation() {
+  enrichmentVersion.value += 1
+  lastItinerarySignature.value = ''
   conversationId.value = undefined
   currentItinerary.value = null
+}
+
+function isUsableImageUrl(rawUrl: string): boolean {
+  const value = (rawUrl || '').trim()
+  if (!value) {
+    return false
+  }
+
+  if (!/^https?:\/\//i.test(value)) {
+    return false
+  }
+
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase()
+    if (!host) {
+      return false
+    }
+
+    if (host === 'example.com' || host.endsWith('.example.com')) {
+      return false
+    }
+
+    return true
+  } catch {
+    return false
+  }
 }
 
 function normalizePeriod(raw: string): DayPeriod {
@@ -135,12 +211,21 @@ function normalizePeriod(raw: string): DayPeriod {
   return 'morning'
 }
 
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : []
+}
+
 function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItinerary {
   const cloned = JSON.parse(JSON.stringify(source)) as StructuredItinerary
 
-  cloned.dailyPlans = (cloned.dailyPlans || []).map((plan, index) => {
+  const sourcePlans = ensureArray<DailyPlan>(cloned.dailyPlans)
+
+  cloned.dailyPlans = sourcePlans.map((plan, index) => {
+    const rawPlan = plan as { activities?: unknown }
+    const sourceActivities = ensureArray<Activity>(rawPlan.activities)
+
     plan.day = index + 1
-    plan.activities = (plan.activities || []).map((activity) => {
+    plan.activities = sourceActivities.map((activity) => {
       const raw = activity as unknown as {
         imageUrl?: string
         image?: string
@@ -150,6 +235,7 @@ function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItin
       const fallbackImage = [raw.imageUrl, raw.image, raw.picture].find(
         (value): value is string => typeof value === 'string' && value.trim().length > 0,
       )
+      const candidateImage = activity.imageUrl || fallbackImage || ''
       const fallbackAddress = typeof raw.address === 'string' ? raw.address : ''
       return {
         ...activity,
@@ -157,7 +243,7 @@ function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItin
         name: activity.name || '',
         description: activity.description || '',
         type: activity.type || 'attraction',
-        imageUrl: activity.imageUrl || fallbackImage || '',
+        imageUrl: isUsableImageUrl(candidateImage) ? candidateImage : '',
         location: activity.location || { address: fallbackAddress },
         estimatedCost: Number(activity.estimatedCost || 0),
       }
@@ -167,6 +253,141 @@ function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItin
 
   cloned.days = cloned.dailyPlans.length
   return cloned
+}
+
+async function resolveImageByQuery(query: string): Promise<string> {
+  const normalizedQuery = query.trim().toLowerCase()
+  if (!normalizedQuery) {
+    return ''
+  }
+
+  const cached = imageQueryCache.get(normalizedQuery)
+  if (cached !== undefined) {
+    return cached
+  }
+
+  const image = await fetchFirst(query)
+  const imageUrlCandidate =
+    image?.landscapeUrl || image?.large2xUrl || image?.largeUrl || image?.mediumUrl || ''
+  const imageUrl = isUsableImageUrl(imageUrlCandidate) ? imageUrlCandidate : ''
+
+  imageQueryCache.set(normalizedQuery, imageUrl)
+  return imageUrl
+}
+
+async function enrichItineraryImages(source: StructuredItinerary): Promise<StructuredItinerary> {
+  const enriched = JSON.parse(JSON.stringify(source)) as StructuredItinerary
+  const tasks: Array<Promise<void>> = []
+  let filledCount = 0
+  const maxFillCount = 9
+
+  for (const plan of ensureArray<DailyPlan>(enriched.dailyPlans)) {
+    const activities = ensureArray<Activity>((plan as { activities?: unknown }).activities)
+
+    for (const activity of activities) {
+      if (filledCount >= maxFillCount) {
+        break
+      }
+
+      if (isUsableImageUrl(activity.imageUrl || '')) {
+        continue
+      }
+
+      activity.imageUrl = ''
+
+      filledCount += 1
+      const attractionName = activity.name?.trim() || '旅行景点'
+      const destination = enriched.destination?.trim() || ''
+      const primaryQuery = destination ? `${destination} ${attractionName}` : attractionName
+      const fallbackQuery = destination || attractionName
+
+      tasks.push(
+        (async () => {
+          const primaryImage = await resolveImageByQuery(primaryQuery)
+          activity.imageUrl = primaryImage || (await resolveImageByQuery(fallbackQuery))
+        })(),
+      )
+    }
+  }
+
+  if (tasks.length > 0) {
+    await Promise.all(tasks)
+  }
+
+  return enriched
+}
+
+function toDailyHighlights(itinerary: StructuredItinerary): Record<number, string[]> {
+  const highlights: Record<number, string[]> = {}
+
+  for (const plan of ensureArray<DailyPlan>(itinerary.dailyPlans)) {
+    const activities = ensureArray<Activity>((plan as { activities?: unknown }).activities)
+
+    const dayItems = activities
+      .map((activity) => {
+        const time = activity.time?.trim() || ''
+        const name = activity.name?.trim() || ''
+        const description = activity.description?.trim() || ''
+
+        if (!name && !description) {
+          return ''
+        }
+
+        if (time && name && description) {
+          return `${time} ${name}：${description}`
+        }
+
+        if (time && name) {
+          return `${time} ${name}`
+        }
+
+        return [time, name, description].filter(Boolean).join(' ')
+      })
+      .filter(Boolean)
+
+    if (dayItems.length > 0) {
+      highlights[plan.day] = dayItems
+    }
+  }
+
+  return highlights
+}
+
+async function saveCurrentItinerary() {
+  if (!currentItinerary.value || isSavingTrip.value) {
+    return
+  }
+
+  const itinerary = currentItinerary.value
+  if (!itinerary.destination?.trim()) {
+    message.warning('当前行程缺少目的地，暂时无法保存')
+    return
+  }
+
+  isSavingTrip.value = true
+  try {
+    const request: API.TripSaveRequest = {
+      destination: itinerary.destination,
+      days: itinerary.days,
+      budget: itinerary.budget,
+      theme: itinerary.theme,
+      dailyHighlights: toDailyHighlights(itinerary),
+      structuredData: JSON.stringify(itinerary),
+    }
+
+    const response = await saveTrip(request)
+    if (response.data.code !== 0 || !response.data.data) {
+      throw new Error(response.data.message || '保存失败')
+    }
+
+    message.success('行程已保存，正在跳转详情')
+    router.push(`/trips/${response.data.data}`)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '保存失败，请稍后重试'
+    message.error(errorMessage)
+  } finally {
+    isSavingTrip.value = false
+  }
 }
 
 function buildPlannerPrompt(userInput: string): string {
@@ -188,7 +409,7 @@ async function handleSendMessage(text: string) {
       conversationId.value = newConversationId
     },
     (data: StructuredItinerary) => {
-      currentItinerary.value = normalizeIncomingItinerary(data)
+      applyStructuredItinerary(data)
     },
     prompt
   )
@@ -233,7 +454,7 @@ onUnmounted(() => {
 
 .timeline-main {
   flex: 1;
-  min-height: 0;
+  min-height: 420px;
   padding: 12px 0;
   display: flex;
 }
@@ -293,6 +514,12 @@ onUnmounted(() => {
 .bottom-chat :deep(.input-container) {
   max-width: 960px;
   margin: 0 auto;
+}
+
+@media (max-width: 960px) {
+  .timeline-main {
+    min-height: 320px;
+  }
 }
 
 .empty-stage {
