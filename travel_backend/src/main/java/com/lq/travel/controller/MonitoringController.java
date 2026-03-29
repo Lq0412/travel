@@ -1,8 +1,8 @@
 package com.lq.travel.controller;
 
-import com.lq.travel.AI.service.AIUserContextService;
-import com.lq.travel.AI.service.QuotaService;
-import com.lq.travel.AI.util.AICacheHandler;
+import com.lq.travel.service.AIUserContextService;
+import com.lq.travel.service.QuotaService;
+import com.lq.travel.util.AICacheHandler;
 import com.lq.travel.annotation.AuthCheck;
 import com.lq.travel.common.ResponseDTO;
 import jakarta.annotation.Resource;

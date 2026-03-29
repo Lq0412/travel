@@ -1,6 +1,6 @@
 package com.lq.travel.config;
 
-import com.lq.travel.AI.provider.DashScopeProvider;
+import com.lq.travel.provider.DashScopeProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;

@@ -7,12 +7,12 @@ import com.lq.travel.model.dto.ai.AIRequest;
 import com.lq.travel.model.dto.ai.AIResponse;
 import com.lq.travel.model.dto.ai.AgentRequest;
 import com.lq.travel.common.ResponseDTO;
-import com.lq.travel.AI.service.AIService;
-import com.lq.travel.AI.service.AgentService;
-import com.lq.travel.AI.service.AIMessageService;
-import com.lq.travel.AI.service.QuotaService;
-import com.lq.travel.AI.interfaces.StreamCallback;
-import com.lq.travel.AI.agent.impl.GenericTravelAgent;
+import com.lq.travel.service.AIService;
+import com.lq.travel.service.AgentService;
+import com.lq.travel.service.AIMessageService;
+import com.lq.travel.service.QuotaService;
+import com.lq.travel.callback.StreamCallback;
+import com.lq.travel.agent.impl.GenericTravelAgent;
 import com.lq.travel.annotation.AuthCheck;
 import com.lq.travel.model.entity.User;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
@@ -182,7 +182,7 @@ public class AIController {
                     .build();
             
                 // 获取通用旅行Agent并使用智能意图识别
-                com.lq.travel.AI.interfaces.Agent agent = agentService.getAgent("generic-travel");
+                com.lq.travel.agent.Agent agent = agentService.getAgent("generic-travel");
                 if (agent instanceof GenericTravelAgent tourismAgent) {
                     tourismAgent.executeStreamWithIntent(agentRequest, conversationId, new StreamCallback() {
                         private final StringBuilder full = new StringBuilder();

@@ -2,7 +2,7 @@ package com.lq.travel.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lq.travel.common.ResponseDTO;
-import com.lq.travel.AI.service.QuotaService;
+import com.lq.travel.service.QuotaService;
 import com.lq.travel.common.DeleteRequest;
 import com.lq.travel.common.ResponseUtils;
 import com.lq.travel.constant.UserConstant;

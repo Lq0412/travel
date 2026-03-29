@@ -6,7 +6,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lq.travel.model.dto.ai.AIRequest;
 import com.lq.travel.model.dto.ai.AIResponse;
-import com.lq.travel.AI.service.AIService;
+import com.lq.travel.service.AIService;
 import com.lq.travel.exception.BusinessException;
 import com.lq.travel.exception.ErrorCode;
 import com.lq.travel.mapper.TripMapper;
