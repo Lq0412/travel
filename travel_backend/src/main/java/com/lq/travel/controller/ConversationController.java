@@ -1,8 +1,8 @@
 package com.lq.travel.controller;
 
-import com.lq.travel.AI.model.entity.AIConversation;
-import com.lq.travel.AI.model.entity.AIMessage;
-import com.lq.travel.AI.model.vo.AIConversationVO;
+import com.lq.travel.model.entity.AIConversation;
+import com.lq.travel.model.entity.AIMessage;
+import com.lq.travel.model.vo.AIConversationVO;
 import com.lq.travel.common.ResponseDTO;
 import com.lq.travel.AI.service.AIConversationService;
 import com.lq.travel.AI.service.AIMessageService;

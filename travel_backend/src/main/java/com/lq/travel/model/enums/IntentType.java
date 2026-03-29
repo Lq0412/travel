@@ -1,4 +1,4 @@
-package com.lq.travel.AI.model;
+package com.lq.travel.model.enums;
 
 /**
  * 用户意图类型枚举

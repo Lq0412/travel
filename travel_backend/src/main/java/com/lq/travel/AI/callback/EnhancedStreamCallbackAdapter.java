@@ -1,7 +1,7 @@
 package com.lq.travel.AI.callback;
 
 import com.lq.travel.AI.interfaces.StreamCallback;
-import com.lq.travel.AI.model.IntentType;
+import com.lq.travel.model.enums.IntentType;
 import com.lq.travel.AI.util.StructuredItineraryExtractor;
 import lombok.extern.slf4j.Slf4j;
 

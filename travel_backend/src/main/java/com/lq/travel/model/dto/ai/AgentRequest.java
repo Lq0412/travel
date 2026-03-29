@@ -1,4 +1,4 @@
-package com.lq.travel.AI.model;
+package com.lq.travel.model.dto.ai;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

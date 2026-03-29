@@ -1,8 +1,8 @@
 package com.lq.travel.AI.service;
 
 import com.lq.travel.AI.interfaces.Agent;
-import com.lq.travel.AI.model.AgentRequest;
-import com.lq.travel.AI.model.AgentResponse;
+import com.lq.travel.model.dto.ai.AgentRequest;
+import com.lq.travel.model.dto.ai.AgentResponse;
 
 /**
  * 代理服务接口

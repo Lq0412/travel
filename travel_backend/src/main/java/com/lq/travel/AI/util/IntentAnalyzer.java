@@ -1,6 +1,6 @@
 package com.lq.travel.AI.util;
 
-import com.lq.travel.AI.model.IntentType;
+import com.lq.travel.model.enums.IntentType;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.regex.Pattern;

@@ -1,8 +1,8 @@
 package com.lq.travel.AI.agent;
 
 import com.lq.travel.AI.interfaces.Agent;
-import com.lq.travel.AI.model.AgentRequest;
-import com.lq.travel.AI.model.AgentResponse;
+import com.lq.travel.model.dto.ai.AgentRequest;
+import com.lq.travel.model.dto.ai.AgentResponse;
 import com.lq.travel.AI.service.AIService;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;

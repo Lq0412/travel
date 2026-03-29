@@ -6,10 +6,10 @@
 -->
 
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.lq.travel.AI.mapper.AIConversationMapper">
+<mapper namespace="com.lq.travel.mapper.AIConversationMapper">
 
     <!-- 获取用户的对话列表（分页） -->
-    <select id="selectUserConversations" resultType="com.lq.travel.AI.model.entity.AIConversation">
+    <select id="selectUserConversations" resultType="com.lq.travel.model.entity.AIConversation">
         SELECT id, user_id, title, provider, model, status, create_time, update_time, is_delete
         FROM ai_conversation
         WHERE user_id = #{userId} AND is_delete = 0

@@ -1,8 +1,8 @@
 package com.lq.travel.AI.service.impl;
 
-import com.lq.travel.AI.mapper.AIMessageMapper;
-import com.lq.travel.AI.model.entity.AIMessage;
-import com.lq.travel.AI.model.AIRequest;
+import com.lq.travel.mapper.AIMessageMapper;
+import com.lq.travel.model.entity.AIMessage;
+import com.lq.travel.model.dto.ai.AIRequest;
 import com.lq.travel.AI.service.AIMessageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

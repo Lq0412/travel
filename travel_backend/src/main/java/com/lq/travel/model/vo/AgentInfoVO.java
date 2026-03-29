@@ -1,4 +1,4 @@
-package com.lq.travel.AI.model.vo;
+package com.lq.travel.model.vo;
 
 import lombok.Data;
 import lombok.Builder;

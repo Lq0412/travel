@@ -1,5 +1,9 @@
-package com.lq.travel.AI.model.vo;
+package com.lq.travel.model.entity;
 
+import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import lombok.Data;
 import lombok.Builder;
 import lombok.AllArgsConstructor;
@@ -8,14 +12,15 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * AI对话视图对象
- * 用于前端展示对话信息
+ * AI对话实体
+ * 用于存储AI对话记录
  */
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class AIConversationVO {
+@TableName("ai_conversation")
+public class AIConversation {
     
     /**
      * 对话ID
@@ -50,25 +55,18 @@ public class AIConversationVO {
     /**
      * 创建时间
      */
+    @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
     
     /**
      * 更新时间
      */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
     
     /**
-     * 消息数量（可选，用于前端显示）
+     * 是否删除
      */
-    private Integer messageCount;
-    
-    /**
-     * 最后一条消息内容（可选，用于前端显示）
-     */
-    private String lastMessage;
-    
-    /**
-     * 最后一条消息时间（可选，用于前端显示）
-     */
-    private LocalDateTime lastMessageTime;
+        @TableLogic(value = "false", delval = "true")
+    private Boolean isDelete;
 }

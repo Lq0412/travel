@@ -2,8 +2,8 @@ package com.lq.travel.AI.service;
 
 
 import com.lq.travel.AI.interfaces.StreamCallback;
-import com.lq.travel.AI.model.AIRequest;
-import com.lq.travel.AI.model.AIResponse;
+import com.lq.travel.model.dto.ai.AIRequest;
+import com.lq.travel.model.dto.ai.AIResponse;
 
 import java.util.Map;
 

@@ -1,7 +1,7 @@
 package com.lq.travel.AI.interfaces;
 
-import com.lq.travel.AI.model.AIRequest;
-import com.lq.travel.AI.model.AIResponse;
+import com.lq.travel.model.dto.ai.AIRequest;
+import com.lq.travel.model.dto.ai.AIResponse;
 
 /**
  * AI提供商接口

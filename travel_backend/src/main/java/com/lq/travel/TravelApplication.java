@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(scanBasePackages = "com.lq.travel")
-@MapperScan({"com.lq.travel.mapper", "com.lq.travel.AI.mapper"})
+@MapperScan({"com.lq.travel.mapper"})
 @EnableAsync
 @EnableScheduling
 @EnableAspectJAutoProxy(exposeProxy = true)

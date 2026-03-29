@@ -1,7 +1,7 @@
 package com.lq.travel.AI.service;
 
-import com.lq.travel.AI.model.entity.AIConversation;
-import com.lq.travel.AI.model.vo.AIConversationVO;
+import com.lq.travel.model.entity.AIConversation;
+import com.lq.travel.model.vo.AIConversationVO;
 
 import java.util.List;
 

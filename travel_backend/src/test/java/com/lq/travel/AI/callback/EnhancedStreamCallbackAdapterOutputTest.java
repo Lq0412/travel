@@ -1,7 +1,7 @@
 package com.lq.travel.AI.callback;
 
 import com.lq.travel.AI.interfaces.StreamCallback;
-import com.lq.travel.AI.model.IntentType;
+import com.lq.travel.model.enums.IntentType;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicBoolean;

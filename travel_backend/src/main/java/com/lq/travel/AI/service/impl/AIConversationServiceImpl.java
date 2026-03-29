@@ -1,8 +1,8 @@
 package com.lq.travel.AI.service.impl;
 
-import com.lq.travel.AI.mapper.AIConversationMapper;
-import com.lq.travel.AI.model.entity.AIConversation;
-import com.lq.travel.AI.model.vo.AIConversationVO;
+import com.lq.travel.mapper.AIConversationMapper;
+import com.lq.travel.model.entity.AIConversation;
+import com.lq.travel.model.vo.AIConversationVO;
 import com.lq.travel.AI.service.AIConversationService;
 import com.lq.travel.AI.service.AIMessageService;
 import lombok.extern.slf4j.Slf4j;

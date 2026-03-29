@@ -1,7 +1,7 @@
-package com.lq.travel.AI.mapper;
+package com.lq.travel.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.lq.travel.AI.model.entity.KnowledgeAttraction;
+import com.lq.travel.model.entity.KnowledgeAttraction;
 import org.apache.ibatis.annotations.Mapper;
 
 /**

@@ -2,9 +2,9 @@ package com.lq.travel.AI.service.impl;
 
 import com.lq.travel.AI.interfaces.AIProvider;
 import com.lq.travel.AI.interfaces.StreamCallback;
-import com.lq.travel.AI.model.AIRequest;
-import com.lq.travel.AI.model.AIResponse;
-import com.lq.travel.AI.model.entity.AIMessage;
+import com.lq.travel.model.dto.ai.AIRequest;
+import com.lq.travel.model.dto.ai.AIResponse;
+import com.lq.travel.model.entity.AIMessage;
 import com.lq.travel.AI.service.AIService;
 import com.lq.travel.AI.service.AIMessageService;
 import com.lq.travel.AI.util.AICacheHandler;

@@ -1,7 +1,7 @@
 package com.lq.travel.AI.service;
 
-import com.lq.travel.AI.model.entity.AIMessage;
-import com.lq.travel.AI.model.AIRequest;
+import com.lq.travel.model.entity.AIMessage;
+import com.lq.travel.model.dto.ai.AIRequest;
 
 import java.util.List;
 

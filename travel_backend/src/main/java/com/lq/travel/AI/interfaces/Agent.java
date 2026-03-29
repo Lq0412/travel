@@ -1,7 +1,7 @@
 package com.lq.travel.AI.interfaces;
 
-import com.lq.travel.AI.model.AgentRequest;
-import com.lq.travel.AI.model.AgentResponse;
+import com.lq.travel.model.dto.ai.AgentRequest;
+import com.lq.travel.model.dto.ai.AgentResponse;
 
 /**
  * 智能代理接口
