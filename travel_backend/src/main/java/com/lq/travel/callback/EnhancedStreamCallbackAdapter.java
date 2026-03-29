@@ -35,21 +35,8 @@ public class EnhancedStreamCallbackAdapter implements StreamCallback {
     @Override
     public void onComplete() {
         // 在流式结束时统一提取结构化数据，保证 JSON 提取完整性。
-        if (!structuredDataSent && intent == IntentType.ITINERARY_GENERATION) {
-            Optional<String> normalizedJson = StructuredItineraryExtractor.extractAndNormalize(fullResponse.toString());
-            if (normalizedJson.isPresent()) {
-                try {
-                    delegate.onData("\n__STRUCTURED_DATA_START__\n");
-                    delegate.onData(normalizedJson.get());
-                    delegate.onData("\n__STRUCTURED_DATA_END__\n");
-                    structuredDataSent = true;
-                    log.info("已提取并发送标准化结构化数据，长度: {} 字符", normalizedJson.get().length());
-                } catch (Exception e) {
-                    log.error("发送结构化数据失败", e);
-                }
-            } else {
-                log.warn("流式响应完成，但未能提取到有效的JSON数据");
-            }
+        if (!structuredDataSent && shouldAttemptStructuredExtraction()) {
+            trySendStructuredData();
         }
         
         log.info("流式响应完成 - 意图: {}, 总长度: {} 字符, 已发送结构化数据: {}", 
@@ -75,5 +62,31 @@ public class EnhancedStreamCallbackAdapter implements StreamCallback {
      */
     public boolean isStructuredDataSent() {
         return structuredDataSent;
+    }
+
+    private boolean shouldAttemptStructuredExtraction() {
+        return intent == IntentType.ITINERARY_GENERATION || intent == IntentType.GENERAL_CHAT;
+    }
+
+    private void trySendStructuredData() {
+        Optional<String> normalizedJson = StructuredItineraryExtractor.extractAndNormalize(fullResponse.toString());
+        if (normalizedJson.isPresent()) {
+            try {
+                delegate.onData("\n__STRUCTURED_DATA_START__\n");
+                delegate.onData(normalizedJson.get());
+                delegate.onData("\n__STRUCTURED_DATA_END__\n");
+                structuredDataSent = true;
+                log.info("已提取并发送标准化结构化数据，长度: {} 字符, 意图: {}", normalizedJson.get().length(), intent.getDescription());
+            } catch (Exception e) {
+                log.error("发送结构化数据失败", e);
+            }
+            return;
+        }
+
+        if (intent == IntentType.ITINERARY_GENERATION) {
+            log.warn("流式响应完成，但未能提取到有效的JSON数据");
+        } else {
+            log.debug("通用聊天响应未命中结构化行程JSON，跳过发送结构化数据");
+        }
     }
 }

@@ -11,15 +11,28 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 public class IntentAnalyzer {
-    
-    // 行程规划关键词模式
-    private static final Pattern ITINERARY_PATTERN = Pattern.compile(
-        ".*(帮我|给我|想要|需要|请帮|麻烦).*(规划|安排|制定|设计|生成|做一份|出一份|一版).*(行程|计划|路线|方案)|" +
-        ".*(生成|规划|安排|制定|设计).*(行程|计划|路线|方案)|" +
-        ".*(几天|\\d+\\s*天|\\d+\\s*日).*(游|旅游|旅行|路线|行程)|" +
-        ".*怎么玩.*|" +
-        ".*(行程|路线|方案).*(推荐|建议).*|" +
-        ".*(帮我做|做一份|出一份|一版).*(行程|路线|方案).*"
+    private static final Pattern DIRECT_ITINERARY_PATTERN = Pattern.compile(
+        "(旅游规划|旅行规划|旅游计划|旅行计划|行程规划|路线规划|行程安排|旅游攻略|旅行攻略)"
+    );
+
+    private static final Pattern PLAN_VERB_PATTERN = Pattern.compile(
+        "(规划|安排|制定|设计|生成|做一份|出一份|做个|策划|定制)"
+    );
+
+    private static final Pattern PLAN_NOUN_PATTERN = Pattern.compile(
+        "(行程|计划|路线|方案|攻略)"
+    );
+
+    private static final Pattern TRAVEL_PATTERN = Pattern.compile(
+        "(游玩|旅游|旅行|出游|出行|度假|去哪玩|怎么玩)"
+    );
+
+    private static final Pattern DAY_PATTERN = Pattern.compile(
+        "(几天|\\d+\\s*[天日]|[一二三四五六七八九十两]+\\s*[天日])"
+    );
+
+    private static final Pattern STRUCTURED_JSON_PATTERN = Pattern.compile(
+        "(结构化行程|结构化\\s*json|输出要求|dailyplans|totalestimatedcost|imageurl)"
     );
     
     // 景点查询关键词模式
@@ -41,10 +54,11 @@ public class IntentAnalyzer {
         }
         
         String input = userInput.toLowerCase();
+        String itineraryReason = matchItineraryReason(input);
         
         // 优先匹配行程规划（更具体的意图）
-        if (ITINERARY_PATTERN.matcher(input).find()) {
-            log.info("识别为行程规划意图: {}", userInput);
+        if (itineraryReason != null) {
+            log.info("识别为行程规划意图(规则: {}): {}", itineraryReason, userInput);
             return IntentType.ITINERARY_GENERATION;
         }
         
@@ -57,6 +71,36 @@ public class IntentAnalyzer {
         // 默认通用聊天
         log.info("识别为通用聊天意图: {}", userInput);
         return IntentType.GENERAL_CHAT;
+    }
+
+    private static String matchItineraryReason(String input) {
+        if (DIRECT_ITINERARY_PATTERN.matcher(input).find()) {
+            return "direct_itinerary_keywords";
+        }
+
+        boolean hasPlanVerb = PLAN_VERB_PATTERN.matcher(input).find();
+        boolean hasPlanNoun = PLAN_NOUN_PATTERN.matcher(input).find();
+        boolean hasTravelWord = TRAVEL_PATTERN.matcher(input).find();
+        boolean hasDayExpression = DAY_PATTERN.matcher(input).find();
+        boolean hasStructuredJsonHint = STRUCTURED_JSON_PATTERN.matcher(input).find();
+
+        if (hasStructuredJsonHint && (hasTravelWord || hasPlanNoun || hasPlanVerb)) {
+            return "structured_json_requirement";
+        }
+
+        if (hasPlanVerb && (hasPlanNoun || hasTravelWord)) {
+            return "plan_verb_with_plan_or_travel";
+        }
+
+        if (hasDayExpression && (hasTravelWord || hasPlanNoun || hasPlanVerb)) {
+            return "day_expression_with_travel_context";
+        }
+
+        if (input.contains("怎么玩")) {
+            return "how_to_play";
+        }
+
+        return null;
     }
     
     /**
