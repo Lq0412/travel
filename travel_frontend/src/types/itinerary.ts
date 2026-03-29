@@ -28,6 +28,8 @@ export interface Activity {
   imageUrl?: string
   location?: {
     address: string
+    longitude?: number
+    latitude?: number
     coordinates?: [number, number]
   }
   estimatedCost?: number

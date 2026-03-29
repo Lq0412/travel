@@ -18,8 +18,13 @@
     </header>
 
     <section v-if="isLoggedIn" class="planner-stage">
-      <div class="timeline-main">
-        <ItineraryTimelineBoard :itinerary="currentItinerary" />
+      <div class="stage-content">
+        <div class="timeline-panel">
+          <ItineraryTimelineBoard :itinerary="currentItinerary" />
+        </div>
+        <div class="map-panel">
+          <DynamicMap :itinerary="currentItinerary" />
+        </div>
       </div>
 
       <div class="bottom-chat">
@@ -71,6 +76,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import ChatInput from '@/pages/user/ChatInput.vue'
 import ItineraryTimelineBoard from '@/pages/workspace/ItineraryTimelineBoard.vue'
+import DynamicMap from '@/pages/workspace/DynamicMap.vue'
 import type { Activity, DailyPlan, StructuredItinerary } from '@/types/itinerary'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 import { useVisualContent } from '@/composables/useVisualContent'
@@ -410,7 +416,7 @@ function buildPlannerPrompt(userInput: string): string {
     themeInstruction = '【偏好要求：大学生特种兵打卡游】必须是高性价比、高密度的行程。包含网红打卡点、高性价比夜市和小吃街，不强制高品质酒店，主打一个高效低预算游玩。'
   }
 
-  const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。dailyPlans.activities 中每个景点必须包含：time（只允许 morning/noon/evening 三种）、name、description、type、location.address、estimatedCost、imageUrl。'
+  const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。dailyPlans.activities 中每个景点必须包含：time（只允许 morning/noon/evening 三种）、name、description、type、location.address、location.longitude(真实的经度)、location.latitude(真实的纬度)、estimatedCost、imageUrl。'
 
   return `${userInput}\n\n${themeInstruction ? themeInstruction + '\n\n' : ''}${baseConstraint}`
 }
@@ -473,14 +479,27 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
-.timeline-main {
+.stage-content {
   flex: 1;
+  display: flex;
   min-height: 420px;
+  gap: 16px;
   padding: 12px 0;
+}
+
+.timeline-panel {
+  flex: 1.5; /* 时间轴占更大比例 */
+  min-width: 0;
   display: flex;
 }
 
-.timeline-main :deep(.timeline-board) {
+.map-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.timeline-panel :deep(.timeline-board) {
   width: 100%;
   height: 100%;
   box-shadow: none; /* 移除外层阴影 */
@@ -552,8 +571,12 @@ onUnmounted(() => {
 }
 
 @media (max-width: 960px) {
-  .timeline-main {
+  .stage-content {
+    flex-direction: column;
     min-height: 320px;
+  }
+  .map-panel {
+    display: none; /* 在小屏幕上隐藏地图，避免过分拥挤 */
   }
 }
 
