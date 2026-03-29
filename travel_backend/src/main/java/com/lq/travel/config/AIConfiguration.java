@@ -1,4 +1,4 @@
-package com.lq.travel.AI.core.config;
+package com.lq.travel.config;
 
 import com.lq.travel.AI.core.agent.impl.GenericTravelAgent;
 import com.lq.travel.AI.core.service.AIService;

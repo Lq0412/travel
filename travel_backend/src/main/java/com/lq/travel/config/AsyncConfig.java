@@ -1,4 +1,4 @@
-package com.lq.travel.AI.core.config;
+package com.lq.travel.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

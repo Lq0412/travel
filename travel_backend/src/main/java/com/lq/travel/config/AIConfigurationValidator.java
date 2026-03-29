@@ -1,4 +1,4 @@
-package com.lq.travel.AI.core.config;
+package com.lq.travel.config;
 
 import com.lq.travel.AI.core.provider.DashScopeProvider;
 import lombok.extern.slf4j.Slf4j;

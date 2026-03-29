@@ -1,4 +1,4 @@
-package com.lq.travel.AI.core.config;
+package com.lq.travel.config;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
