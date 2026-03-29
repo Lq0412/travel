@@ -1,6 +1,6 @@
 package com.lq.travel.AI.core.callback;
 
-import com.lq.travel.AI.core.constants.RegexPatterns;
+import com.lq.travel.constant.RegexPatterns;
 import com.lq.travel.AI.core.interfaces.StreamCallback;
 
 import java.util.regex.Matcher;
@@ -113,4 +113,5 @@ public class StreamCallbackAdapter implements StreamCallback {
         return buffer.toString();
     }
 }
+
 

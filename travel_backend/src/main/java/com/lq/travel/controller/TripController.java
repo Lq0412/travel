@@ -1,6 +1,6 @@
 package com.lq.travel.controller;
 
-import com.lq.travel.AI.core.annotation.ApiRateLimit;
+import com.lq.travel.annotation.ApiRateLimit;
 import com.lq.travel.annotation.AuthCheck;
 import com.lq.travel.common.ResponseUtils;
 import com.lq.travel.exception.BusinessException;
@@ -113,5 +113,6 @@ public class TripController {
     }
     
 }
+
 
 

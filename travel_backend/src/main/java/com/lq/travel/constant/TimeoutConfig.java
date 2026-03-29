@@ -1,4 +1,4 @@
-package com.lq.travel.AI.core.constants;
+package com.lq.travel.constant;
 
 /**
  * 超时配置常量
@@ -30,4 +30,5 @@ public class TimeoutConfig {
         throw new AssertionError("TimeoutConfig不应该被实例化");
     }
 }
+
 

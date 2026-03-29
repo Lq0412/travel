@@ -1,4 +1,4 @@
-package com.lq.travel.AI.core.annotation;
+package com.lq.travel.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -28,4 +28,5 @@ public @interface ApiRateLimit {
      */
     String name() default "default";
 }
+
 

@@ -1,4 +1,4 @@
-package com.lq.travel.AI.core.constants;
+package com.lq.travel.constant;
 
 import java.util.regex.Pattern;
 
@@ -60,4 +60,5 @@ public class RegexPatterns {
         throw new AssertionError("RegexPatterns不应该被实例化");
     }
 }
+
 

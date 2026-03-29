@@ -1,6 +1,6 @@
 package com.lq.travel.AI.core.util;
 
-import com.lq.travel.AI.core.constants.RegexPatterns;
+import com.lq.travel.constant.RegexPatterns;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.regex.Matcher;
@@ -66,4 +66,5 @@ public class ResponseParser {
         throw new AssertionError("ResponseParser不应该被实例化");
     }
 }
+
 

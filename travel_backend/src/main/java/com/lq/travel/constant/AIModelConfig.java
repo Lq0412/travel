@@ -1,4 +1,4 @@
-package com.lq.travel.AI.core.constants;
+package com.lq.travel.constant;
 
 /**
  * AI模型配置常量
@@ -53,4 +53,5 @@ public class AIModelConfig {
         throw new AssertionError("AIModelConfig不应该被实例化");
     }
 }
+
 

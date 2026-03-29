@@ -1,8 +1,8 @@
 package com.lq.travel.controller;
 
-import com.lq.travel.AI.core.annotation.ApiRateLimit;
-import com.lq.travel.AI.core.constants.AIModelConfig;
-import com.lq.travel.AI.core.constants.TimeoutConfig;
+import com.lq.travel.annotation.ApiRateLimit;
+import com.lq.travel.constant.AIModelConfig;
+import com.lq.travel.constant.TimeoutConfig;
 import com.lq.travel.AI.core.model.AIRequest;
 import com.lq.travel.AI.core.model.AIResponse;
 import com.lq.travel.AI.core.model.AgentRequest;
@@ -273,3 +273,4 @@ public class AIController {
     }
     
 }
+
