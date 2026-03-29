@@ -462,7 +462,7 @@ onUnmounted(() => {
 .timeline-main :deep(.timeline-board) {
   width: 100%;
   height: 100%;
-  box-shadow: 0 16px 36px rgba(18, 52, 97, 0.08);
+  box-shadow: none; /* 移除外层阴影 */
 }
 
 .bottom-chat {
