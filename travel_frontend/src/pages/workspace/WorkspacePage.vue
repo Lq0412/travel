@@ -23,6 +23,15 @@
       </div>
 
       <div class="bottom-chat">
+        <div class="theme-selector-container">
+          <span class="theme-label">选择定制偏好：</span>
+          <a-radio-group v-model:value="selectedTheme" size="small" button-style="solid">
+            <a-radio-button value="none">常规路线</a-radio-button>
+            <a-radio-button value="elderly">👴 银发族适老游</a-radio-button>
+            <a-radio-button value="rural">🌾 乡村振兴非遗游</a-radio-button>
+            <a-radio-button value="student">🎒 大学生特种兵游</a-radio-button>
+          </a-radio-group>
+        </div>
         <div class="quick-suggestions">
           <button
             v-for="suggestion in suggestionInputs"
@@ -77,6 +86,7 @@ const { illustrations, fetchFirst } = useVisualContent()
 const currentItinerary = ref<StructuredItinerary | null>(null)
 const conversationId = ref<string | undefined>(undefined)
 const isSavingTrip = ref(false)
+const selectedTheme = ref<string>('none')
 const enrichmentVersion = ref(0)
 const lastItinerarySignature = ref('')
 const imageQueryCache = new Map<string, string>()
@@ -391,7 +401,18 @@ async function saveCurrentItinerary() {
 }
 
 function buildPlannerPrompt(userInput: string): string {
-  return `${userInput}\n\n【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。dailyPlans.activities 中每个景点必须包含：time（只允许 morning/noon/evening 三种）、name、description、type、location.address、estimatedCost、imageUrl。`
+  let themeInstruction = ''
+  if (selectedTheme.value === 'elderly') {
+    themeInstruction = '【偏好要求：银发族适老游】必须安排慢节奏的行程，减少步行和高负荷运动，优先安排自然风光和人文历史景点，且关注周边餐饮和休息区的便利性。'
+  } else if (selectedTheme.value === 'rural') {
+    themeInstruction = '【偏好要求：乡村振兴非遗游】必须带有社会价值导向，重点安排当地乡村生态旅游、非物质文化遗产体验、助农项目和小众冷门特色乡村点位。'
+  } else if (selectedTheme.value === 'student') {
+    themeInstruction = '【偏好要求：大学生特种兵打卡游】必须是高性价比、高密度的行程。包含网红打卡点、高性价比夜市和小吃街，不强制高品质酒店，主打一个高效低预算游玩。'
+  }
+
+  const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。dailyPlans.activities 中每个景点必须包含：time（只允许 morning/noon/evening 三种）、name、description、type、location.address、estimatedCost、imageUrl。'
+
+  return `${userInput}\n\n${themeInstruction ? themeInstruction + '\n\n' : ''}${baseConstraint}`
 }
 
 async function handleSendMessage(text: string) {
@@ -473,6 +494,20 @@ onUnmounted(() => {
   border-top: 1px solid rgba(15, 28, 46, 0.08);
   background: linear-gradient(180deg, rgba(244, 247, 251, 0.3), rgba(244, 247, 251, 0.98));
   backdrop-filter: blur(8px);
+}
+
+.theme-selector-container {
+  display: flex;
+  margin: 0 auto 12px;
+  max-width: 960px;
+  align-items: center;
+}
+
+.theme-label {
+  font-size: 13px;
+  color: var(--color-text-secondary, #666);
+  margin-right: 8px;
+  font-weight: 500;
 }
 
 .quick-suggestions {
