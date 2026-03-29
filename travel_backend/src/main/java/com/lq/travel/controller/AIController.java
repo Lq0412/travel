@@ -3,16 +3,16 @@ package com.lq.travel.controller;
 import com.lq.travel.annotation.ApiRateLimit;
 import com.lq.travel.constant.AIModelConfig;
 import com.lq.travel.constant.TimeoutConfig;
-import com.lq.travel.AI.core.model.AIRequest;
-import com.lq.travel.AI.core.model.AIResponse;
-import com.lq.travel.AI.core.model.AgentRequest;
+import com.lq.travel.AI.model.AIRequest;
+import com.lq.travel.AI.model.AIResponse;
+import com.lq.travel.AI.model.AgentRequest;
 import com.lq.travel.common.ResponseDTO;
-import com.lq.travel.AI.core.service.AIService;
-import com.lq.travel.AI.core.service.AgentService;
-import com.lq.travel.AI.core.service.AIMessageService;
-import com.lq.travel.AI.core.service.QuotaService;
-import com.lq.travel.AI.core.interfaces.StreamCallback;
-import com.lq.travel.AI.core.agent.impl.GenericTravelAgent;
+import com.lq.travel.AI.service.AIService;
+import com.lq.travel.AI.service.AgentService;
+import com.lq.travel.AI.service.AIMessageService;
+import com.lq.travel.AI.service.QuotaService;
+import com.lq.travel.AI.interfaces.StreamCallback;
+import com.lq.travel.AI.agent.impl.GenericTravelAgent;
 import com.lq.travel.annotation.AuthCheck;
 import com.lq.travel.model.entity.User;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
@@ -182,7 +182,7 @@ public class AIController {
                     .build();
             
                 // 获取通用旅行Agent并使用智能意图识别
-                com.lq.travel.AI.core.interfaces.Agent agent = agentService.getAgent("generic-travel");
+                com.lq.travel.AI.interfaces.Agent agent = agentService.getAgent("generic-travel");
                 if (agent instanceof GenericTravelAgent tourismAgent) {
                     tourismAgent.executeStreamWithIntent(agentRequest, conversationId, new StreamCallback() {
                         private final StringBuilder full = new StringBuilder();

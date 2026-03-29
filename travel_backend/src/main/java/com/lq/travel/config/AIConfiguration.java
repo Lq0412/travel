@@ -1,8 +1,8 @@
 package com.lq.travel.config;
 
-import com.lq.travel.AI.core.agent.impl.GenericTravelAgent;
-import com.lq.travel.AI.core.service.AIService;
-import com.lq.travel.AI.core.service.AgentService;
+import com.lq.travel.AI.agent.impl.GenericTravelAgent;
+import com.lq.travel.AI.service.AIService;
+import com.lq.travel.AI.service.AgentService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
