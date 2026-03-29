@@ -46,6 +46,11 @@ onMounted(() => {
   if (props.itinerary) {
     drawItinerary(props.itinerary)
   }
+
+  // Hack for Leaflet inside Vue Flexbox rendering issue
+  setTimeout(() => {
+    mapInstance?.invalidateSize()
+  }, 300)
 })
 
 onUnmounted(() => {
@@ -111,6 +116,8 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
 .dynamic-map-container {
   width: 100%;
   height: 100%;
+  min-height: 420px; /* 确保最小高度，防止在 Flex 布局中塌陷 */
+  flex: 1;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* slight depth */
