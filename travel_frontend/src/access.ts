@@ -34,17 +34,5 @@ router.beforeEach(async (to, from, next) => {
     }
   }
   
-  // 商家路由权限校验
-  if (toUrl.startsWith('/merchant')) {
-    if (!loginUser || (loginUser.userRole !== 'merchant' && loginUser.userRole !== 'admin')) {
-      message.error('需要商家权限')
-      next(`/user/login?redirect=${to.fullPath}`)
-      return
-    }
-    
-    // 注意：即使userRole是merchant，后端仍会检查merchant表中是否有对应记录
-    // 如果没有记录，后端API会返回40101错误，前端会显示友好提示
-  }
-  
   next()
 })

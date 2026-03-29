@@ -25,6 +25,7 @@ export interface Activity {
   name: string
   type: 'attraction' | 'transport' | 'rest' | 'meal'
   description: string
+  imageUrl?: string
   location?: {
     address: string
     coordinates?: [number, number]

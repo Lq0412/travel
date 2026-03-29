@@ -9,17 +9,12 @@ import com.lq.travel.AI.core.model.AIResponse;
 import com.lq.travel.AI.core.service.AIService;
 import com.lq.travel.exception.BusinessException;
 import com.lq.travel.exception.ErrorCode;
-import com.lq.travel.mapper.MemoryCardMapper;
-import com.lq.travel.mapper.PostMapper;
 import com.lq.travel.mapper.TripMapper;
 import com.lq.travel.model.dto.trip.TripGenerateRequest;
 import com.lq.travel.model.dto.trip.TripGenerateResponse;
 import com.lq.travel.model.dto.trip.TripSaveRequest;
-import com.lq.travel.model.entity.MemoryCard;
-import com.lq.travel.model.entity.Post;
 import com.lq.travel.model.entity.Trip;
 import com.lq.travel.model.entity.User;
-import com.lq.travel.model.vo.MemoryCardVO;
 import com.lq.travel.model.vo.TripPhotoVO;
 import com.lq.travel.model.vo.TripVO;
 import com.lq.travel.service.TripPhotoService;
@@ -45,20 +40,14 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements Tr
 
     private static final String STATUS_PLANNED = "planned";
     private static final String STATUS_COMPLETED = "completed";
-    
+
     @Resource
     private AIService aiService;
-    
+
     @Autowired
     @Lazy
     private TripPhotoService tripPhotoService;
 
-    @Resource
-    private MemoryCardMapper memoryCardMapper;
-
-    @Resource
-    private PostMapper postMapper;
-    
     private final ObjectMapper objectMapper = new ObjectMapper();
     
     @Override
@@ -386,51 +375,11 @@ public class TripServiceImpl extends ServiceImpl<TripMapper, Trip> implements Tr
         List<TripPhotoVO> photos = tripPhotoService.getTripPhotos(trip.getId());
         vo.setPhotos(photos);
 
-        MemoryCard currentMemoryCard = loadCurrentMemoryCard(trip.getId());
-        if (currentMemoryCard != null) {
-            vo.setMemoryCard(convertMemoryCardToVO(currentMemoryCard));
-
-            Post publishedPost = findPublishedPost(trip.getUserId(), currentMemoryCard.getImageUrl());
-            if (publishedPost != null) {
-                vo.setPublishedToInspiration(Boolean.TRUE);
-                vo.setPublishedPostId(publishedPost.getId());
-            } else {
-                vo.setPublishedToInspiration(Boolean.FALSE);
-            }
-        } else {
-            vo.setPublishedToInspiration(Boolean.FALSE);
-        }
-        
         return vo;
     }
 
     private String normalizeTripStatus(String status) {
         return STATUS_COMPLETED.equals(status) ? STATUS_COMPLETED : STATUS_PLANNED;
-    }
-
-    private MemoryCard loadCurrentMemoryCard(Long tripId) {
-        return memoryCardMapper.selectOne(new QueryWrapper<MemoryCard>()
-                .eq("trip_id", tripId)
-                .eq("is_delete", 0)
-                .orderByDesc("create_time")
-                .last("limit 1"));
-    }
-
-    private MemoryCardVO convertMemoryCardToVO(MemoryCard memoryCard) {
-        MemoryCardVO vo = new MemoryCardVO();
-        BeanUtils.copyProperties(memoryCard, vo);
-        return vo;
-    }
-
-    private Post findPublishedPost(Long userId, String coverUrl) {
-        if (!StringUtils.hasText(coverUrl)) {
-            return null;
-        }
-        return postMapper.selectOne(new QueryWrapper<Post>()
-                .eq("user_id", userId)
-                .eq("cover_url", coverUrl)
-                .orderByDesc("create_time")
-                .last("limit 1"));
     }
 }
 

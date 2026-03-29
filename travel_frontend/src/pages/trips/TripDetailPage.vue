@@ -13,12 +13,9 @@
 
       <div class="hero-actions">
         <a-tag :color="getTripStatusTone(trip.status)">{{ getTripStatusLabel(trip.status) }}</a-tag>
-        <a-tag v-if="hasTripMemoryCard(trip)" color="cyan">已有回忆图</a-tag>
-        <a-tag v-if="isTripPublished(trip)" color="success">已发布</a-tag>
         <a-button v-if="normalizeTripStatus(trip.status) !== 'completed'" @click="markCompleted" :loading="completing">
           标记已完成
         </a-button>
-        <a-button type="primary" @click="setTab('publish')">去发布</a-button>
       </div>
 
       <div class="hero-visuals" :class="{ 'single-card': !destinationPhoto }">
@@ -35,7 +32,7 @@
           <img :src="illustrations.journey" alt="journey illustration" />
           <div>
             <strong>执行与沉淀继续在这里完成</strong>
-            <p>上传照片、生成回忆图、发布到灵感广场，都围绕同一个行程继续推进。</p>
+            <p>上传照片、管理行程，围绕同一个行程继续推进。</p>
           </div>
         </article>
       </div>
@@ -71,24 +68,6 @@
               <strong>{{ trip.photos?.length || 0 }}</strong>
               <span>已关联照片</span>
             </div>
-            <div class="overview-item">
-              <strong>{{ hasTripMemoryCard(trip) ? '已生成' : '未生成' }}</strong>
-              <span>回忆图</span>
-            </div>
-            <div class="overview-item">
-              <strong>{{ isTripPublished(trip) ? '已沉淀' : '待沉淀' }}</strong>
-              <span>灵感内容</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="content-card" v-if="trip.memoryCard?.imageUrl">
-          <div class="card-head">
-            <h2>当前回忆图</h2>
-            <p>发布时将默认作为灵感内容封面。</p>
-          </div>
-          <div class="memory-preview">
-            <img :src="trip.memoryCard.imageUrl" :alt="`${trip.destination} 回忆图`" />
           </div>
         </div>
       </div>
@@ -116,115 +95,10 @@
 
     <section v-else-if="activeTab === 'photos'" class="content-card">
       <div class="card-head">
-        <h2>照片管理与生成入口</h2>
-        <p>在这一页完成照片关联，并直接发起回忆图生成。</p>
+        <h2>照片管理</h2>
+        <p>在这一页完成照片关联和管理。</p>
       </div>
-      <TripMemoryPage embedded />
-    </section>
-
-    <section v-else-if="activeTab === 'memory'" class="content-stack">
-      <div class="content-card">
-        <div class="card-head">
-          <div>
-            <h2>回忆图工作区</h2>
-            <p>支持查看当前版本、重新生成和切换历史版本。</p>
-          </div>
-          <div class="card-actions">
-            <a-button @click="setTab('photos')">去照片页上传</a-button>
-            <a-button @click="refreshTrip">刷新</a-button>
-            <a-button @click="loadHistory" :loading="historyLoading">刷新历史</a-button>
-            <a-button type="primary" @click="regenerate" :loading="regenerating">重新生成</a-button>
-          </div>
-        </div>
-
-        <div v-if="trip.memoryCard?.imageUrl" class="memory-showcase">
-          <img :src="trip.memoryCard.imageUrl" :alt="`${trip.destination} 回忆图`" />
-          <div class="memory-meta">
-            <span>模板：{{ trip.memoryCard.templateName || 'default' }}</span>
-            <span>状态：{{ trip.memoryCard.status || 'success' }}</span>
-            <span>更新时间：{{ formatWorkflowDateTime(trip.memoryCard.updateTime || trip.memoryCard.createTime) }}</span>
-          </div>
-        </div>
-        <a-empty v-else description="还没有回忆图，请先去照片页上传并生成" />
-      </div>
-
-      <div class="content-card">
-        <div class="card-head">
-          <h2>历史版本</h2>
-          <p>保留多次生成结果，方便比较和切换更合适的版本。</p>
-        </div>
-
-        <div v-if="historyList.length" class="history-grid">
-          <article v-for="history in historyList" :key="history.id" class="history-card">
-            <img :src="history.imageUrl" alt="历史回忆图" />
-            <div class="history-body">
-              <strong>{{ history.templateName || 'default' }}</strong>
-              <p>{{ formatWorkflowDateTime(history.createTime) }}</p>
-              <div class="history-actions">
-                <a-button @click="setCurrent(history.id)" :loading="historyActionId === history.id">
-                  设为当前
-                </a-button>
-                <a :href="history.imageUrl" target="_blank" rel="noreferrer">查看原图</a>
-              </div>
-            </div>
-          </article>
-        </div>
-        <a-empty v-else description="暂无历史版本" />
-      </div>
-    </section>
-
-    <section v-else class="content-card">
-      <div class="card-head">
-        <div>
-          <h2>发布到灵感广场</h2>
-          <p>只有生成成功的回忆图才允许发布，确保主流程结果可信。</p>
-        </div>
-        <a-tag v-if="isTripPublished(trip)" color="success">该行程已发布过</a-tag>
-      </div>
-
-      <a-alert
-        v-if="!trip.memoryCard?.imageUrl"
-        type="warning"
-        show-icon
-        message="请先在照片或回忆图标签生成成功的回忆图，再进行发布。"
-        class="publish-alert"
-      />
-
-      <a-form layout="vertical" class="publish-form">
-        <a-form-item label="标题">
-          <a-input v-model:value="publishForm.title" placeholder="输入游记标题" />
-        </a-form-item>
-        <a-form-item label="正文">
-          <a-textarea
-            v-model:value="publishForm.content"
-            :rows="8"
-            placeholder="描述此次行程亮点、体验和建议"
-          />
-        </a-form-item>
-        <a-form-item label="标签">
-          <a-input v-model:value="tagsInput" placeholder="使用英文逗号分隔，例如：广州,3天,#AI生成" />
-        </a-form-item>
-      </a-form>
-
-      <div v-if="trip.memoryCard?.imageUrl" class="publish-preview">
-        <img :src="trip.memoryCard.imageUrl" alt="回忆图封面预览" />
-        <div>
-          <strong>封面预览</strong>
-          <p>当前回忆图将自动作为灵感内容封面。</p>
-        </div>
-      </div>
-
-      <div class="publish-actions">
-        <a-button @click="refreshTrip">刷新状态</a-button>
-        <a-button
-          type="primary"
-          :disabled="!trip.memoryCard?.imageUrl"
-          :loading="publishing"
-          @click="publish"
-        >
-          {{ isTripPublished(trip) ? '再次发布到灵感广场' : '发布到灵感广场' }}
-        </a-button>
-      </div>
+      <p style="color: var(--color-muted);">照片上传功能开发中...</p>
     </section>
   </div>
 </template>
@@ -236,27 +110,18 @@ import { message } from 'ant-design-vue'
 import {
   completeTrip,
   getTripById,
-  publishToForum,
 } from '@/api/tripController'
-import {
-  getMemoryCardHistory,
-  regenerateMemoryCard,
-  setMemoryCardCurrentFromHistory,
-} from '@/api/memoryCardController'
 import PexelsCredit from '@/components/content/PexelsCredit.vue'
 import { useVisualContent } from '@/composables/useVisualContent'
-import TripMemoryPage from '@/pages/trips/TripMemoryPage.vue'
 import {
   formatWorkflowDate,
   formatWorkflowDateTime,
   getTripStatusLabel,
   getTripStatusTone,
-  hasTripMemoryCard,
-  isTripPublished,
   normalizeTripStatus,
 } from '@/utils/tripWorkflow'
 
-type TripTab = 'overview' | 'photos' | 'memory' | 'publish'
+type TripTab = 'overview' | 'photos'
 
 const route = useRoute()
 const router = useRouter()
@@ -265,25 +130,13 @@ const { fetchFirst, illustrations } = useVisualContent()
 const tabs: Array<{ key: TripTab; label: string; desc: string }> = [
   { key: 'overview', label: '概览', desc: '统一看进度与亮点' },
   { key: 'photos', label: '照片', desc: '上传并管理素材' },
-  { key: 'memory', label: '回忆图', desc: '查看结果与历史版本' },
-  { key: 'publish', label: '发布', desc: '沉淀为灵感内容' },
 ]
 
 const activeTab = ref<TripTab>('overview')
 const trip = ref<API.TripVO | null>(null)
 const completing = ref(false)
-const regenerating = ref(false)
-const publishing = ref(false)
-const historyLoading = ref(false)
-const historyActionId = ref<number | null>(null)
-const historyList = ref<API.MemoryCardHistory[]>([])
-const tagsInput = ref('')
 const destinationPhoto = ref<API.ContentImageVO | null>(null)
 const lastDestinationQuery = ref('')
-const publishForm = ref({
-  title: '',
-  content: '',
-})
 
 const highlightEntries = computed(() => {
   const highlights = trip.value?.dailyHighlights
@@ -317,26 +170,6 @@ function setTab(tab: TripTab) {
   })
 }
 
-function prefillPublishForm(currentTrip: API.TripVO) {
-  const highlightText = highlightEntries.value
-    .slice(0, 3)
-    .map((item) => `第 ${item.day} 天：${item.items.slice(0, 3).join('，')}`)
-    .join('\n')
-
-  publishForm.value.title = `${currentTrip.destination || '旅行'} ${currentTrip.days || 0}天旅程记录`
-  publishForm.value.content = `目的地：${currentTrip.destination || '待补充'}
-天数：${currentTrip.days || 0} 天
-主题：${currentTrip.theme || '通用主题'}
-
-亮点摘要：
-${highlightText || '本次行程正在继续完善中。'}
-
-这次旅行的回忆图已经生成，欢迎继续交流路线、体验和避坑建议。`
-  tagsInput.value = [currentTrip.destination, `${currentTrip.days || 0}天`, '#AI生成', currentTrip.theme]
-    .filter(Boolean)
-    .join(',')
-}
-
 function photoSrc(image?: API.ContentImageVO | null) {
   return image?.landscapeUrl || image?.large2xUrl || image?.largeUrl || image?.mediumUrl || ''
 }
@@ -367,7 +200,6 @@ async function refreshTrip() {
     const resp = await getTripById({ id } as any)
     trip.value = resp?.data?.data || null
     if (trip.value) {
-      prefillPublishForm(trip.value)
       await loadDestinationPhoto(trip.value.destination)
     } else {
       destinationPhoto.value = null
@@ -397,109 +229,10 @@ async function markCompleted() {
   }
 }
 
-async function regenerate() {
-  if (!trip.value?.id) {
-    return
-  }
-
-  regenerating.value = true
-  try {
-    await regenerateMemoryCard({ tripId: trip.value.id })
-    message.success('已提交重新生成任务，请稍后刷新查看')
-    setTab('photos')
-    await refreshTrip()
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.message || error?.message || '重新生成失败'
-    message.error(errorMsg)
-  } finally {
-    regenerating.value = false
-  }
-}
-
-async function loadHistory() {
-  if (!trip.value?.id) {
-    return
-  }
-
-  historyLoading.value = true
-  try {
-    const resp = await getMemoryCardHistory({ tripId: trip.value.id })
-    historyList.value = resp?.data?.data || []
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.message || error?.message || '加载历史版本失败'
-    message.error(errorMsg)
-  } finally {
-    historyLoading.value = false
-  }
-}
-
-async function setCurrent(historyId?: number) {
-  if (!historyId) {
-    return
-  }
-
-  historyActionId.value = historyId
-  try {
-    await setMemoryCardCurrentFromHistory({ historyId })
-    message.success('已设为当前回忆图')
-    await Promise.all([refreshTrip(), loadHistory()])
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.message || error?.message || '设置失败'
-    message.error(errorMsg)
-  } finally {
-    historyActionId.value = null
-  }
-}
-
-async function publish() {
-  if (!trip.value?.id) {
-    return
-  }
-  if (!trip.value.memoryCard?.imageUrl) {
-    message.warning('请先生成回忆图')
-    return
-  }
-  if (!publishForm.value.title.trim() || !publishForm.value.content.trim()) {
-    message.warning('请补全标题和正文')
-    return
-  }
-
-  publishing.value = true
-  try {
-    const tags = tagsInput.value
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-
-    await publishToForum(
-      { id: trip.value.id } as any,
-      {
-        title: publishForm.value.title.trim(),
-        content: publishForm.value.content.trim(),
-        memoryCardId: trip.value.memoryCard?.id,
-        tags: tags.length ? tags : ['#AI生成'],
-      } as any
-    )
-
-    message.success('已发布到灵感广场')
-    await refreshTrip()
-    router.push('/inspiration')
-  } catch (error: any) {
-    const errorMsg = error?.response?.data?.message || error?.message || '发布失败'
-    message.error(errorMsg)
-  } finally {
-    publishing.value = false
-  }
-}
-
 watch(
   () => route.query.tab,
   async () => {
     syncTabFromRoute()
-    if (activeTab.value === 'memory') {
-      await loadHistory()
-      await refreshTrip()
-    }
   }
 )
 
@@ -507,18 +240,12 @@ watch(
   () => route.params.id,
   async () => {
     await refreshTrip()
-    if (activeTab.value === 'memory') {
-      await loadHistory()
-    }
   }
 )
 
 onMounted(async () => {
   syncTabFromRoute()
   await refreshTrip()
-  if (activeTab.value === 'memory') {
-    await loadHistory()
-  }
 })
 </script>
 
@@ -764,25 +491,6 @@ onMounted(async () => {
   }
 }
 
-.memory-preview,
-.memory-showcase {
-  img {
-    width: 100%;
-    border-radius: 22px;
-    border: 1px solid rgba(15, 28, 46, 0.08);
-    object-fit: cover;
-  }
-}
-
-.memory-meta {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 12px;
-  color: var(--color-muted);
-  font-size: 13px;
-}
-
 .highlight-list {
   display: grid;
   gap: 10px;
@@ -791,105 +499,12 @@ onMounted(async () => {
   color: var(--color-text-secondary);
 }
 
-.history-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.history-card {
-  display: grid;
-  grid-template-columns: 160px 1fr;
-  gap: 16px;
-  padding: 16px;
-  border-radius: 22px;
-  background: #f9fbff;
-  border: 1px solid rgba(15, 28, 46, 0.06);
-
-  img {
-    width: 100%;
-    height: 160px;
-    border-radius: 18px;
-    object-fit: cover;
-  }
-}
-
-.history-body {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 12px;
-
-  strong {
-    color: var(--color-text);
-  }
-
-  p {
-    margin: 0;
-    color: var(--color-muted);
-  }
-}
-
-.history-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  a {
-    color: var(--primary-700);
-  }
-}
-
-.publish-alert {
-  margin-bottom: 18px;
-}
-
-.publish-form {
-  max-width: 860px;
-}
-
-.publish-preview {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 18px;
-  margin-top: 10px;
-  padding: 18px;
-  border-radius: 22px;
-  background: #f9fbff;
-  border: 1px solid rgba(15, 28, 46, 0.06);
-
-  img {
-    width: 100%;
-    border-radius: 18px;
-    object-fit: cover;
-  }
-
-  strong {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--color-text);
-  }
-
-  p {
-    margin: 0;
-    color: var(--color-muted);
-  }
-}
-
-.publish-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 18px;
-}
-
 @media (max-width: 1200px) {
   .trip-hero,
   .hero-visuals,
   .workflow-tabs,
   .content-grid,
-  .overview-grid,
-  .history-grid,
-  .publish-preview {
+  .overview-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -904,14 +519,6 @@ onMounted(async () => {
     h1 {
       font-size: 28px;
     }
-  }
-
-  .history-card {
-    grid-template-columns: 1fr;
-  }
-
-  .publish-actions {
-    flex-direction: column;
   }
 }
 </style>

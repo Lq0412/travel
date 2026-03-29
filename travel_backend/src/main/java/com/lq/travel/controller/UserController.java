@@ -11,11 +11,8 @@ import com.lq.travel.exception.ErrorCode;
 import com.lq.travel.exception.ThrowUtils;
 import com.lq.travel.model.dto.user.*;
 import com.lq.travel.model.entity.User;
-import com.lq.travel.model.dto.picture.PictureUploadRequest;
-import com.lq.travel.model.vo.PictureVO;
 import com.lq.travel.model.vo.LoginUserVO;
 import com.lq.travel.model.vo.UserVO;
-import com.lq.travel.service.PictureService;
 import com.lq.travel.service.UserService;
 import com.lq.travel.annotation.AuthCheck;
 import jakarta.annotation.Resource;
@@ -44,8 +41,6 @@ public class UserController {
     @Resource
     private QuotaService quotaService;
     
-    @Resource
-    private PictureService pictureService;
 
     // 1. 用户注册
     @PostMapping("/register")
@@ -239,29 +234,51 @@ public class UserController {
     
     /**
      * Upload avatar and persist to current user
+     * 简化版本：直接保存文件到服务器
      */
     @PostMapping("/avatar/upload")
     public ResponseDTO<String> uploadAvatar(@RequestPart("file") MultipartFile file, HttpServletRequest request) {
         if (file == null || file.isEmpty()) {
-            return ResponseUtils.error(ErrorCode.PARAMS_ERROR, "Please upload an avatar image");
+            return ResponseUtils.error(ErrorCode.PARAMS_ERROR, "请上传头像图片");
         }
-        User loginUser = userService.getLoginUser(request);
-        ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
+        
+        try {
+            User loginUser = userService.getLoginUser(request);
+            ThrowUtils.throwIf(loginUser == null, ErrorCode.NO_AUTH_ERROR);
 
-        PictureUploadRequest uploadRequest = new PictureUploadRequest();
-        uploadRequest.setPicName("avatar-" + loginUser.getId());
-        PictureVO pictureVO = pictureService.uploadPicture(file, uploadRequest, loginUser);
+            // 保存文件到本地目录
+            String fileName = "avatar_" + loginUser.getId() + "_" + System.currentTimeMillis() + 
+                    getFileExtension(file.getOriginalFilename());
+            java.io.File uploadDir = new java.io.File("uploads/avatars");
+            if (!uploadDir.exists()) {
+                uploadDir.mkdirs();
+            }
+            
+            java.io.File destFile = new java.io.File(uploadDir, fileName);
+            file.transferTo(destFile);
+            
+            String avatarUrl = "/uploads/avatars/" + fileName;
+            
+            User updateUser = new User();
+            updateUser.setId(loginUser.getId());
+            updateUser.setUserAvatar(avatarUrl);
+            boolean updateResult = userService.updateById(updateUser);
+            ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新头像失败");
 
-        User updateUser = new User();
-        updateUser.setId(loginUser.getId());
-        updateUser.setUserAvatar(pictureVO.getUrl());
-        boolean updateResult = userService.updateById(updateUser);
-        ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "Failed to update avatar");
+            User refreshedUser = userService.getById(loginUser.getId());
+            request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, refreshedUser);
 
-        User refreshedUser = userService.getById(loginUser.getId());
-        request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, refreshedUser);
-
-        return ResponseUtils.success(pictureVO.getUrl());
+            return ResponseUtils.success(avatarUrl);
+        } catch (Exception e) {
+            return ResponseUtils.error(ErrorCode.SYSTEM_ERROR, "上传头像失败: " + e.getMessage());
+        }
+    }
+    
+    private String getFileExtension(String fileName) {
+        if (fileName == null || !fileName.contains(".")) {
+            return ".jpg";
+        }
+        return fileName.substring(fileName.lastIndexOf("."));
     }
 
     /**

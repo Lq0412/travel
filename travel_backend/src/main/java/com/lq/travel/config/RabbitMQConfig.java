@@ -50,19 +50,6 @@ public class RabbitMQConfig {
 
     // ========== 队列 ==========
     @Bean
-    public Queue memoryCardQueue() {
-        return QueueBuilder.durable(AiMqConstants.QUEUE_MEMORY_CARD)
-                .withArgument("x-dead-letter-exchange", AiMqConstants.EXCHANGE_AI_TASK_DLX)
-                .withArgument("x-dead-letter-routing-key", AiMqConstants.ROUTING_MEMORY_CARD)
-                .build();
-    }
-
-    @Bean
-    public Queue memoryCardDlq() {
-        return QueueBuilder.durable(AiMqConstants.QUEUE_MEMORY_CARD_DLQ).build();
-    }
-
-    @Bean
     public Queue tripPlanQueue() {
         return QueueBuilder.durable(AiMqConstants.QUEUE_TRIP_PLAN)
                 .withArgument("x-dead-letter-exchange", AiMqConstants.EXCHANGE_AI_TASK_DLX)
@@ -89,20 +76,6 @@ public class RabbitMQConfig {
     }
 
     // ========== 绑定 ==========
-    @Bean
-    public Binding memoryCardBinding(Queue memoryCardQueue, DirectExchange aiTaskExchange) {
-        return BindingBuilder.bind(memoryCardQueue)
-                .to(aiTaskExchange)
-                .with(AiMqConstants.ROUTING_MEMORY_CARD);
-    }
-
-    @Bean
-    public Binding memoryCardDlqBinding(Queue memoryCardDlq, DirectExchange aiTaskDlx) {
-        return BindingBuilder.bind(memoryCardDlq)
-                .to(aiTaskDlx)
-                .with(AiMqConstants.ROUTING_MEMORY_CARD);
-    }
-
     @Bean
     public Binding tripPlanBinding(Queue tripPlanQueue, DirectExchange aiTaskExchange) {
         return BindingBuilder.bind(tripPlanQueue)

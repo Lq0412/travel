@@ -30,11 +30,6 @@ public class TripVO implements Serializable {
      * 照片列表
      */
     private List<TripPhotoVO> photos;
-    
-    /**
-     * 回忆图信息
-     */
-    private MemoryCardVO memoryCard;
 
     /**
      * 是否已发布到灵感广场

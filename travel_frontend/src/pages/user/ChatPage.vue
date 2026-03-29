@@ -55,7 +55,12 @@
     </div>
 
     <!-- 聊天内容区 -->
-    <ChatWindow ref="windowRef" @update:loading="(v) => (isLoading = v)" />
+    <ChatWindow
+      ref="windowRef"
+      :show-itinerary-card="!embedded"
+      @update:loading="(v) => (isLoading = v)"
+      @itinerary-generated="handleItineraryGenerated"
+    />
 
     <!-- 底部输入框 -->
     <div class="input-wrapper">
@@ -66,42 +71,6 @@
       />
     </div>
 
-    <!-- 数字人悬浮按钮 -->
-    <transition name="scale-fade">
-      <div v-if="!embedded && !showDigitalHuman" class="digital-human-fab">
-        <button 
-          @click="toggleDigitalHuman" 
-          class="fab-button"
-          title="数字人助手"
-        >
-          <img src="https://unpkg.com/lucide-static@latest/icons/bot.svg" alt="数字人" class="icon" />
-          <span class="fab-ripple"></span>
-        </button>
-      </div>
-    </transition>
-
-    <!-- 数字人全屏面板 -->
-    <transition name="modal-fade">
-      <div v-if="!embedded && showDigitalHuman" class="digital-human-overlay" @click.self="toggleDigitalHuman">
-        <div class="digital-human-panel" @click.stop>
-          <div class="digital-human-header">
-            <div class="header-left">
-              <img src="https://unpkg.com/lucide-static@latest/icons/bot.svg" alt="" class="header-icon" />
-              <h3>数字人助手</h3>
-            </div>
-            <button @click="toggleDigitalHuman" class="close-btn" title="关闭">
-              <img src="https://unpkg.com/lucide-static@latest/icons/x.svg" alt="关闭" class="icon" />
-            </button>
-          </div>
-          <div class="digital-human-content">
-            <DigitalHumanIframe
-              src="http://127.0.0.1:8888/static/MiniLive_RealTime.html"
-              @loaded="onDigitalHumanLoaded"
-            />
-          </div>
-        </div>
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -109,8 +78,8 @@
 import { shallowRef, ref, computed, onMounted } from 'vue'
 import ChatWindow from './ChatWindow.vue'
 import ChatInput from './ChatInput.vue'
-import DigitalHumanIframe from '@/components/DigitalHumanIframe.vue'
 import type { Conversation } from '@/types/chat'
+import type { StructuredItinerary } from '@/types/itinerary'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 import { getUserConversations, deleteConversation } from '@/api/conversationController'
 
@@ -118,10 +87,14 @@ withDefaults(defineProps<{ embedded?: boolean }>(), {
   embedded: false
 })
 
+const emit = defineEmits<{
+  (e: 'itinerary-generated', data: StructuredItinerary): void
+  (e: 'itinerary-cleared'): void
+}>()
+
 // Use shallowRef for primitive values (Vue best practice)
 const showHistory = shallowRef(false)
 const isLoading = shallowRef(false)
-const showDigitalHuman = shallowRef(false)
 const currentConversationId = shallowRef<string | null>(null)
 
 // Use ref for objects that need deep reactivity
@@ -209,6 +182,7 @@ async function handleSwitch(id: string) {
   console.log('切换会话:', id)
   currentConversationId.value = id
   showHistory.value = false
+  emit('itinerary-cleared')
 
   // 加载选中会话的历史消息
   if (windowRef.value) {
@@ -218,6 +192,10 @@ async function handleSwitch(id: string) {
 
 function handleQuickPrompt(prompt: string) {
   onSend(prompt)
+}
+
+function handleItineraryGenerated(data: StructuredItinerary) {
+  emit('itinerary-generated', data)
 }
 
 function isItineraryRequest(text: string) {
@@ -285,19 +263,7 @@ async function handleNew() {
   if (windowRef.value) {
     windowRef.value.clearMessages()
   }
-}
-
-// 切换数字人显示
-function toggleDigitalHuman() {
-  showDigitalHuman.value = !showDigitalHuman.value
-  // 不再强制重新创建组件，保持角色切换状态
-  // 缓存问题由 DigitalHumanIframe 组件内部的 URL 参数解决
-  console.log('数字人面板状态:', showDigitalHuman.value ? '显示' : '隐藏')
-}
-
-// 数字人加载完成
-function onDigitalHumanLoaded() {
-  console.log('数字人加载完成')
+  emit('itinerary-cleared')
 }
 </script>
 
@@ -534,207 +500,6 @@ function onDigitalHumanLoaded() {
   transform: translateY(-8px);
 }
 
-/* 数字人悬浮按钮 */
-.digital-human-fab {
-  position: fixed;
-  bottom: 32px;
-  right: 32px;
-  z-index: 1000;
-}
-
-.fab-button {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 1px solid var(--color-border);
-  cursor: pointer;
-  box-shadow: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
-  overflow: hidden;
-}
-
-.fab-button:hover {
-  transform: translateY(-2px);
-  background: var(--color-bg-muted);
-  border-color: var(--color-border-strong);
-}
-
-.fab-button:active {
-  transform: translateY(-2px) scale(1);
-}
-
-.fab-button .icon {
-  width: 28px;
-  height: 28px;
-  filter: none;
-  z-index: 2;
-  position: relative;
-}
-
-.fab-ripple {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-  animation: ripple 2s ease-out infinite;
-}
-
-@keyframes ripple {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
-  }
-}
-
-/* 数字人全屏遮罩层 */
-.digital-human-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.2);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-}
-
-/* 数字人面板 */
-.digital-human-panel {
-  width: 100%;
-  max-width: 1000px;
-  height: 100%;
-  max-height: 80vh;
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-}
-
-.digital-human-header {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #ffffff;
-  flex-shrink: 0;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.header-icon {
-  width: 28px;
-  height: 28px;
-  filter: none;
-}
-
-.digital-human-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.close-btn {
-  background: rgba(239, 68, 68, 0.1);
-  border: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.close-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  transform: rotate(90deg);
-}
-
-.close-btn .icon {
-  width: 24px;
-  height: 24px;
-  filter: brightness(0) saturate(100%) invert(25%) sepia(93%) saturate(4661%) hue-rotate(344deg) brightness(91%) contrast(91%);
-}
-
-.digital-human-content {
-  flex: 1;
-  min-height: 0;
-  position: relative;
-  background: var(--color-bg-secondary);
-}
-
-.digital-human-content > * {
-  width: 100%;
-  height: 100%;
-}
-
-/* 过渡动画 */
-.scale-fade-enter-active,
-.scale-fade-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.scale-fade-enter-from,
-.scale-fade-leave-to {
-  opacity: 0;
-  transform: scale(0.8);
-}
-
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.modal-fade-enter-active .digital-human-panel,
-.modal-fade-leave-active .digital-human-panel {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.modal-fade-enter-from {
-  opacity: 0;
-}
-
-.modal-fade-enter-from .digital-human-panel {
-  transform: scale(0.9) translateY(20px);
-  opacity: 0;
-}
-
-.modal-fade-leave-to {
-  opacity: 0;
-}
-
-.modal-fade-leave-to .digital-human-panel {
-  transform: scale(0.95) translateY(10px);
-  opacity: 0;
-}
-
 /* 移动端响应式 */
 @media (max-width: 768px) {
   .helper-page {
@@ -765,40 +530,6 @@ function onDigitalHumanLoaded() {
     width: calc(100vw - 32px);
     max-width: 280px;
     left: 0;
-  }
-
-  .digital-human-fab {
-    bottom: 20px;
-    right: 16px;
-  }
-
-  .fab-button {
-    width: 48px;
-    height: 48px;
-  }
-
-  .fab-button .icon {
-    width: 22px;
-    height: 22px;
-  }
-
-  .digital-human-overlay {
-    padding: 0;
-  }
-
-  .digital-human-panel {
-    max-width: 100%;
-    max-height: 100vh;
-    height: 100vh;
-    border-radius: 0;
-  }
-
-  .digital-human-header {
-    padding: 12px 16px;
-  }
-
-  .digital-human-header h3 {
-    font-size: 16px;
   }
 }
 </style>

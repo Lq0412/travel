@@ -105,7 +105,6 @@ const navItems = [
   { label: '首页', path: '/' },
   { label: '规划行程', path: '/workspace' },
   { label: '我的行程', path: '/trips' },
-  { label: '灵感广场', path: '/inspiration' },
   { label: '我的', path: '/profile' },
 ]
 

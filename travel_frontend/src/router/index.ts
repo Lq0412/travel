@@ -3,7 +3,6 @@ import HomePage from '@/pages/HomePage.vue'
 import WorkspacePage from '@/pages/workspace/WorkspacePage.vue'
 import TripsPage from '@/pages/trips/TripsPage.vue'
 import TripDetailPage from '@/pages/trips/TripDetailPage.vue'
-import ForumPage from '@/pages/user/ForumPage.vue'
 import ProfilePage from '@/pages/user/ProfilePage.vue'
 import UserLoginPage from '@/pages/user/UserLoginPage.vue'
 import UserRegisterPage from '@/pages/user/UserRegisterPage.vue'
@@ -15,7 +14,7 @@ const router = createRouter({
       path: '/',
       name: '首页',
       component: HomePage,
-      meta: { layout: 'landing' },
+      meta: { layout: 'topnav' },
     },
     {
       path: '/workspace',
@@ -33,12 +32,6 @@ const router = createRouter({
       path: '/trips/:id',
       name: '行程详情',
       component: TripDetailPage,
-      meta: { layout: 'topnav' },
-    },
-    {
-      path: '/inspiration',
-      name: '灵感广场',
-      component: ForumPage,
       meta: { layout: 'topnav' },
     },
     {
@@ -72,17 +65,6 @@ const router = createRouter({
       name: 'AI 行程规划',
       component: () => import('@/pages/ai/PlannerPage.vue'),
       meta: { layout: 'topnav' },
-    },
-    {
-      path: '/user/forum',
-      redirect: '/inspiration',
-    },
-    {
-      path: '/trips/:id/memory',
-      redirect: (to) => ({
-        path: `/trips/${to.params.id}`,
-        query: { ...to.query, tab: 'memory' },
-      }),
     },
     {
       path: '/:pathMatch(.*)*',

@@ -14,7 +14,7 @@
       
       <!-- 结构化行程展示 -->
       <ItineraryCard 
-        v-if="structuredData" 
+        v-if="showItineraryCard && structuredData" 
         :itinerary="structuredData"
         @save="handleSaveItinerary"
       />
@@ -36,7 +36,10 @@ import { useAutoScroll } from '@/composables/useAutoScroll'
 import { getConversationMessages } from '@/api/conversationController'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 
-// no props for now
+withDefaults(defineProps<{ showItineraryCard?: boolean }>(), {
+  showItineraryCard: true,
+})
+
 const emit = defineEmits<{
   (e: 'update:loading', value: boolean): void
   (e: 'itinerary-generated', data: StructuredItinerary): void

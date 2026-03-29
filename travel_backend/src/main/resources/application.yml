@@ -45,6 +45,7 @@ ai:
       ttl-seconds: 30  # 分布式锁TTL（秒）
       wait-timeout-seconds: 5  # 等待锁超时时间（秒）
   quota:
+    enabled: false  # 配额检查开关（开发时可设为false）
     daily-limit: 10000  # 每日默认配额（tokens）
   rate-limit:
     chat:

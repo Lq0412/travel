@@ -8,7 +8,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import LandingLayout from './layouts/LandingLayout.vue'
 import TopNavLayout from './layouts/TopNavLayout.vue'
 
 const route = useRoute()
@@ -16,17 +15,11 @@ const route = useRoute()
 // 根据路由 meta 动态选择布局
 const layoutComponent = computed(() => {
   const layout = route.meta?.layout as string | undefined
-  
-  switch (layout) {
-    case 'landing':
-      return LandingLayout
-    case 'topnav':
-      return TopNavLayout
-    case 'none':
-      return 'router-view' // 直接渲染页面，无布局
-    default:
-      return TopNavLayout // 默认使用顶部导航布局
+
+  if (layout === 'none') {
+    return 'router-view' // 直接渲染页面，无布局
   }
+  return TopNavLayout // 默认使用顶部导航布局
 })
 </script>
 

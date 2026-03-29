@@ -12,10 +12,6 @@ export function getTripStatusTone(status?: string | null) {
   return normalizeTripStatus(status) === 'completed' ? 'success' : 'processing'
 }
 
-export function hasTripMemoryCard(trip?: API.TripVO | null) {
-  return Boolean(trip?.memoryCard?.imageUrl)
-}
-
 export function isTripPublished(trip?: API.TripVO | null) {
   return Boolean(trip?.publishedToInspiration)
 }

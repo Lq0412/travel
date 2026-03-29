@@ -14,23 +14,12 @@ public class TimeoutConfig {
      */
     public static final long SSE_TIMEOUT_AI_STREAM = 300_000L;
     
-    /**
-     * 数字人对话超时时间（毫秒）
-     * 30秒，适用于快速对话场景
-     */
-    public static final long SSE_TIMEOUT_DIGITAL_HUMAN = 30_000L;
-    
     // ==================== 转换为秒 ====================
     
     /**
      * AI流式响应超时时间（秒）
      */
     public static final int SSE_TIMEOUT_AI_STREAM_SECONDS = 300;
-    
-    /**
-     * 数字人对话超时时间（秒）
-     */
-    public static final int SSE_TIMEOUT_DIGITAL_HUMAN_SECONDS = 30;
     
     // ==================== 私有构造函数 ====================
     

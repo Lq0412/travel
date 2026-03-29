@@ -137,60 +137,37 @@ public class GenericTravelAgent extends BaseAgent {
     private String getSystemPromptByIntent(IntentType intent) {
         return switch (intent) {
             case ITINERARY_GENERATION -> """
-                你是专业的旅行规划师。当用户请求行程规划时，请：
+                你是专业的旅行规划师。
 
-                1. 先用自然语言回应用户（以"观察:"开头）
-                2. 然后输出JSON格式的结构化行程数据
-                3. 结构化数据必须可直接被前端解析并保存，不要输出与 JSON 无关的多余解释
+                当用户请求行程规划时，必须严格按以下格式输出：
+                1. 先输出一段用户可读文案，必须以“观察:”开头。
+                2. 紧接着输出一个 ```json 代码块，且只包含一个 JSON 对象。
+                3. 不要输出“思考:”和“行动:”。
 
-                JSON格式示例：
-                ```json
-                {
-                  "destination": "示例目的地",
-                  "days": 3,
-                  "budget": 2000,
-                  "theme": "休闲度假",
-                  "dailyPlans": [
-                    {
-                      "day": 1,
-                      "date": "2024-11-15",
-                      "activities": [
-                        {
-                          "time": "09:00-11:30",
-                          "name": "示例景点",
-                          "type": "attraction",
-                          "description": "体验目的地的代表性景点与活动",
-                          "location": {
-                            "address": "示例地址",
-                            "coordinates": [113.7289, 23.6891]
-                          },
-                          "estimatedCost": 60,
-                          "tips": ["建议提前查看开放信息", "携带相机记录旅程"]
-                        }
-                      ],
-                      "meals": [
-                        {
-                          "time": "12:00-13:00",
-                          "type": "lunch",
-                          "recommendation": "选择当地特色餐厅",
-                          "estimatedCost": 80
-                        }
-                      ]
-                    }
-                  ],
-                  "totalEstimatedCost": 1800,
-                  "tips": ["建议根据天数控制节奏", "提前预订热门项目和住宿"]
-                }
-                ```
+                JSON 字段必须完整且可直接给前端渲染：
+                - destination: string
+                - days: number
+                - budget: number
+                - theme: string
+                - dailyPlans: array
+                  - day: number
+                  - date: string
+                  - activities: array
+                    - time: 仅允许 morning/noon/evening
+                    - name: string
+                    - type: 仅允许 attraction/transport/rest/meal
+                    - description: string
+                    - imageUrl: string
+                    - location.address: string
+                    - estimatedCost: number
+                    - tips: string[]
+                - totalEstimatedCost: number
+                - tips: string[]
 
-                注意事项：
-                - 时间安排要合理，考虑交通时间
-                - 每个活动要有详细描述和实用建议
-                - 预算要符合实际情况
-                - 坐标使用 [经度, 纬度] 格式
-                - 必须输出完整的JSON数据
-                - 字段名必须与前端结构化行程卡片一致：destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips
-                - dailyPlans 中每一天必须包含 day、date、activities、meals
+                约束：
+                - dailyPlans 的天数必须与 days 一致。
+                - 每天 activities 至少 1 条。
+                - 信息不足时，也要先生成可执行草案，并在 tips 中标注待确认项。
                 """;
             case ATTRACTION_QUERY -> """
                 你是专业的旅行景点助手，擅长介绍各地景点信息。
@@ -219,7 +196,7 @@ public class GenericTravelAgent extends BaseAgent {
         if (intent == IntentType.ITINERARY_GENERATION) {
             prompt.append("【规划要求】\n");
             prompt.append("请为用户生成详细旅行行程，包括：\n");
-            prompt.append("1. 每日详细时间安排（具体到小时）\n");
+            prompt.append("1. 每日按 morning/noon/evening 三个时段安排\n");
             prompt.append("2. 景点、餐饮、住宿推荐\n");
             prompt.append("3. 预算估算（门票、餐饮、住宿）\n");
             prompt.append("4. 实用旅游建议和注意事项\n");

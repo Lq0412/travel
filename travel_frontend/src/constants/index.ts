@@ -72,47 +72,6 @@ export const USER_ROLE = {
 } as const
 
 /**
- * 留言墙相关常量
- */
-export const MESSAGE_WALL = {
-  /** 默认景点ID（从化温泉） */
-  DEFAULT_SCENIC_SPOT_ID: 6,
-  
-  /** 留言最大长度 */
-  MAX_MESSAGE_LENGTH: 200,
-  
-  /** 留言刷新间隔（毫秒） */
-  REFRESH_INTERVAL: 10000,
-  
-  /** 每页显示留言数 */
-  PAGE_SIZE: 100,
-  
-  /** 留言状态 */
-  STATUS: {
-    /** 待审核 */
-    PENDING: 0,
-    /** 已通过 */
-    APPROVED: 1,
-    /** 已拒绝 */
-    REJECTED: 2,
-  },
-  
-  /** 弹幕动画配置 */
-  BARRAGE: {
-    /** 行高 */
-    ROW_HEIGHT: 40,
-    /** 最小动画时长（秒） */
-    MIN_DURATION: 5,
-    /** 最大动画时长（秒） */
-    MAX_DURATION: 20,
-    /** 默认字体大小 */
-    DEFAULT_FONT_SIZE: 14,
-    /** 默认文字颜色 */
-    DEFAULT_COLOR: '#fff',
-  },
-} as const
-
-/**
  * 本地存储键名
  */
 export const STORAGE_KEYS = {
@@ -120,8 +79,6 @@ export const STORAGE_KEYS = {
   TOKEN: 'token',
   /** 用户信息 */
   USER_INFO: 'userInfo',
-  /** 景点ID */
-  SCENIC_SPOT_ID: 'scenic_spot_id',
   /** 主题设置 */
   THEME: 'theme',
   /** 语言设置 */
@@ -140,14 +97,6 @@ export const ROUTES = {
   USER_LOGIN: '/user/login',
   /** 用户注册 */
   USER_REGISTER: '/user/register',
-  /** 管理员用户管理 */
-  ADMIN_USER_MANAGE: '/admin/userManage',
-  /** 商家商品管理 */
-  MERCHANT_PRODUCTS: '/merchant/products',
-  /** 留言墙 */
-  MESSAGE_WALL: '/message-wall',
-  /** 留言墙详情 */
-  MESSAGE_WALL_DETAIL: (scenicSpotId: number) => `/message-wall/${scenicSpotId}`,
 } as const
 
 /**
@@ -158,8 +107,6 @@ export const DEFAULT_IMAGES = {
   BACKGROUND: 'https://open.saintic.com/api/bingPic',
   /** 默认用户头像 */
   USER_AVATAR: '/src/assets/user-avatar.jpg',
-  /** 默认景点封面 */
-  SCENIC_COVER: 'https://via.placeholder.com/300x200?text=No+Image',
 } as const
 
 /**
@@ -250,14 +197,6 @@ export const PRODUCT_STATUS = {
   OFF_SHELF: 0,
   /** 上架 */
   ON_SHELF: 1,
-} as const
-
-/**
- * 数字人相关配置
- */
-export const DIGITAL_HUMAN = {
-  /** 数字人服务URL */
-  SERVICE_URL: import.meta.env.VITE_DIGITAL_HUMAN_URL || 'http://127.0.0.1:8888/static/MiniLive_RealTime.html',
 } as const
 
 /**

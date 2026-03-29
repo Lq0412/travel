@@ -20,10 +20,6 @@ public class TaskMessageProducer {
 
     private final RabbitTemplate rabbitTemplate;
 
-    public void sendMemoryCardTask(Map<String, Object> body) {
-        send(AiMqConstants.ROUTING_MEMORY_CARD, body);
-    }
-
     public void sendTripPlanTask(Map<String, Object> body) {
         send(AiMqConstants.ROUTING_TRIP_PLAN, body);
     }

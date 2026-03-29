@@ -5,6 +5,7 @@ import com.lq.travel.model.entity.User;
 import com.lq.travel.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,12 @@ public class QuotaServiceImpl implements QuotaService {
     
     @Resource
     private UserService userService;
+    
+    /**
+     * 配额检查开关
+     */
+    @Value("${ai.quota.enabled:true}")
+    private boolean quotaEnabled;
     
     /**
      * 每日默认配额（Token数量）
@@ -44,6 +51,12 @@ public class QuotaServiceImpl implements QuotaService {
         if (userId == null) {
             log.warn("userId为空，拒绝请求");
             return false;
+        }
+        
+        // 配额检查开关关闭时直接通过
+        if (!quotaEnabled) {
+            log.debug("配额检查已禁用，用户 {} 直接通过", userId);
+            return true;
         }
         
         // 检查用户角色：管理员无配额限制

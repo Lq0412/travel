@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">我的行程</p>
         <h1>行程库只保留旅程推进所需的信息。</h1>
-        <p>支持按状态、是否已有回忆图、是否已发布筛选，并默认按最近修改排序。</p>
+        <p>支持按状态、是否已发布筛选，并默认按最近修改排序。</p>
       </div>
       <a-button type="primary" size="large" @click="goWorkspace">新建行程</a-button>
     </section>
@@ -17,10 +17,6 @@
       <div class="summary-card">
         <strong>{{ plannedCount }}</strong>
         <span>待出行</span>
-      </div>
-      <div class="summary-card">
-        <strong>{{ memoryReadyCount }}</strong>
-        <span>已有回忆图</span>
       </div>
       <div class="summary-card">
         <strong>{{ publishedCount }}</strong>
@@ -42,9 +38,7 @@
       </a-select>
       <a-select v-model:value="assetFilter" class="filter-item">
         <a-select-option value="all">全部资产</a-select-option>
-        <a-select-option value="hasMemory">已有回忆图</a-select-option>
         <a-select-option value="published">已发布</a-select-option>
-        <a-select-option value="readyToPublish">待发布内容</a-select-option>
       </a-select>
     </section>
 
@@ -78,7 +72,6 @@
         </div>
 
         <div class="trip-foot">
-          <span>{{ hasTripMemoryCard(trip) ? '已有回忆图' : '待生成回忆图' }}</span>
           <span>{{ isTripPublished(trip) ? '已发布' : '未发布' }}</span>
           <span>{{ trip.photos?.length || 0 }} 张照片</span>
         </div>
@@ -99,7 +92,6 @@ import {
   formatWorkflowDateTime,
   getTripStatusLabel,
   getTripStatusTone,
-  hasTripMemoryCard,
   isTripPublished,
   normalizeTripStatus,
 } from '@/utils/tripWorkflow'
@@ -108,12 +100,11 @@ const router = useRouter()
 const trips = ref<API.TripVO[]>([])
 const keyword = ref('')
 const statusFilter = ref<'all' | 'planned' | 'completed'>('all')
-const assetFilter = ref<'all' | 'hasMemory' | 'published' | 'readyToPublish'>('all')
+const assetFilter = ref<'all' | 'published'>('all')
 
 const plannedCount = computed(
   () => trips.value.filter((trip) => normalizeTripStatus(trip.status) === 'planned').length
 )
-const memoryReadyCount = computed(() => trips.value.filter((trip) => hasTripMemoryCard(trip)).length)
 const publishedCount = computed(() => trips.value.filter((trip) => isTripPublished(trip)).length)
 
 const filteredTrips = computed(() => {
@@ -125,16 +116,7 @@ const filteredTrips = computed(() => {
         return false
       }
 
-      if (assetFilter.value === 'hasMemory' && !hasTripMemoryCard(trip)) {
-        return false
-      }
       if (assetFilter.value === 'published' && !isTripPublished(trip)) {
-        return false
-      }
-      if (
-        assetFilter.value === 'readyToPublish' &&
-        (!hasTripMemoryCard(trip) || isTripPublished(trip))
-      ) {
         return false
       }
 

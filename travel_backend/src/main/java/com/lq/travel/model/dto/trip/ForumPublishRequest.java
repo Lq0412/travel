@@ -16,11 +16,6 @@ public class ForumPublishRequest implements Serializable {
     private Long tripId;
     
     /**
-     * 回忆图ID
-     */
-    private Long memoryCardId;
-    
-    /**
      * 标题（可选，不传则自动生成）
      */
     private String title;
