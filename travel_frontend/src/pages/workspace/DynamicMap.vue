@@ -91,8 +91,19 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
         const pt: [number, number] = [lat, lon]
         coords.push(pt)
         
-        // Add Marker
-        const marker = L.marker(pt)
+        // Add Marker with Custom CSS animation
+        const customIcon = L.divIcon({
+          className: 'custom-poi-marker',
+          html: `
+            <div class="poi-pulse"></div>
+            <div class="poi-dot">D${dayIndex}</div>
+          `,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+          popupAnchor: [0, -14]
+        })
+
+        const marker = L.marker(pt, { icon: customIcon })
         marker.bindPopup(`
           <div style="font-weight:bold; margin-bottom:4px;">Day ${dayIndex} - ${activity.name || '景点'}</div>
           <div style="font-size:12px; color:#666;">${activity.location?.address || ''}</div>
@@ -103,11 +114,20 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
   }
 
   if (coords.length > 0) {
-    // Draw route line connecting the points
-    polylineLayer = L.polyline(coords, { color: '#1360ff', weight: 4, opacity: 0.7, dashArray: '8, 8' }).addTo(mapInstance)
+    // Draw route line connecting the points with animation
+    polylineLayer = L.polyline(coords, { 
+      color: '#1360ff', 
+      weight: 4, 
+      opacity: 0.85, 
+      className: 'animated-route'
+    }).addTo(mapInstance)
     
-    // Auto fit bounds
-    mapInstance.fitBounds(L.latLngBounds(coords), { padding: [30, 30] })
+    // Auto fit bounds with a cinematic flyTo animation instead of instant jump
+    mapInstance.flyToBounds(L.latLngBounds(coords), { 
+      padding: [40, 40],
+      duration: 1.5,
+      easeLinearity: 0.25
+    })
   }
 }
 </script>
@@ -129,5 +149,56 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
 :deep(.leaflet-top),
 :deep(.leaflet-bottom) {
   z-index: 500 !important;
+}
+
+/* Custom Marker Styling & Animations */
+:deep(.custom-poi-marker) {
+  position: relative;
+}
+
+:deep(.custom-poi-marker .poi-dot) {
+  width: 28px;
+  height: 28px;
+  background: #1360ff;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(19, 96, 255, 0.4);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+}
+
+:deep(.custom-poi-marker .poi-pulse) {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 40px;
+  height: 40px;
+  background: rgba(19, 96, 255, 0.4);
+  border-radius: 50%;
+  animation: poi-pulse 2s ease-out infinite;
+  z-index: 1;
+}
+
+@keyframes poi-pulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Animated Route Line */
+:deep(.animated-route) {
+  stroke-dasharray: 12, 12;
+  animation: flow-dash 30s linear infinite;
+}
+
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -1000;
+  }
 }
 </style>
