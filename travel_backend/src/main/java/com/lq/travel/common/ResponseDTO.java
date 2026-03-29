@@ -1,12 +1,12 @@
-package com.lq.travel.AI.core.model.dto;
+package com.lq.travel.common;
 
-import lombok.Data;
-import lombok.Builder;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 通用响应DTO
+ * 统一响应DTO
  * 用于统一API响应格式
  */
 @Data
@@ -14,30 +14,30 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class ResponseDTO<T> {
-    
+
     /**
      * 响应码
      * 0 表示成功，其他值表示错误
      */
     @Builder.Default
     private Integer code = 0;
-    
+
     /**
      * 响应消息
      */
     @Builder.Default
     private String message = "success";
-    
+
     /**
      * 响应数据
      */
     private T data;
-    
+
     /**
      * 时间戳
      */
     private Long timestamp;
-    
+
     /**
      * 创建成功响应
      */
@@ -49,7 +49,7 @@ public class ResponseDTO<T> {
                 .timestamp(System.currentTimeMillis())
                 .build();
     }
-    
+
     /**
      * 创建成功响应（带消息）
      */
@@ -61,7 +61,7 @@ public class ResponseDTO<T> {
                 .timestamp(System.currentTimeMillis())
                 .build();
     }
-    
+
     /**
      * 创建错误响应
      */
@@ -72,7 +72,7 @@ public class ResponseDTO<T> {
                 .timestamp(System.currentTimeMillis())
                 .build();
     }
-    
+
     /**
      * 创建错误响应（默认500错误码）
      */

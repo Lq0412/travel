@@ -25,9 +25,10 @@ public class ContentImageController {
      * 搜索 Pexels 图片
      */
     @GetMapping("/search")
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<List<ContentImageVO>> searchImages(
+    public com.lq.travel.common.ResponseDTO<List<ContentImageVO>> searchImages(
             @RequestParam String query,
             @RequestParam(required = false, defaultValue = "6") Integer perPage) {
         return ResponseUtils.success(contentImageService.searchTravelImages(query, perPage));
     }
 }
+

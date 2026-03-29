@@ -1,6 +1,5 @@
 package com.lq.travel.common;
 
-import com.lq.travel.AI.core.model.dto.ResponseDTO;
 import com.lq.travel.exception.ErrorCode;
 
 /**
@@ -90,6 +89,7 @@ public class ResponseUtils {
                 .build();
     }
 }
+
 
 
 

@@ -3,7 +3,7 @@ package com.lq.travel.controller;
 import com.lq.travel.AI.core.model.entity.AIConversation;
 import com.lq.travel.AI.core.model.entity.AIMessage;
 import com.lq.travel.AI.core.model.vo.AIConversationVO;
-import com.lq.travel.AI.core.model.dto.ResponseDTO;
+import com.lq.travel.common.ResponseDTO;
 import com.lq.travel.AI.core.service.AIConversationService;
 import com.lq.travel.AI.core.service.AIMessageService;
 import lombok.extern.slf4j.Slf4j;
@@ -175,3 +175,4 @@ public class ConversationController {
         }
     }
 }
+

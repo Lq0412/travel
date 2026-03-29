@@ -9,7 +9,7 @@ import java.io.Serializable;
 /**
  * 全局响应封装类
  * 
- * @deprecated 已废弃，请使用 {@link com.lq.travel.AI.core.model.dto.ResponseDTO} 替代
+ * @deprecated 已废弃，请使用 {@link com.lq.travel.common.ResponseDTO} 替代
  * @param <T>
  */
 @Deprecated(since = "2025-11-03", forRemoval = true)
@@ -34,3 +34,4 @@ public class BaseResponse<T> implements Serializable {
         this(errorCode.getCode(), null, errorCode.getMessage());
     }
 }
+

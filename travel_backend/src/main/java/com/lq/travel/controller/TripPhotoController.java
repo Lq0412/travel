@@ -32,7 +32,7 @@ public class TripPhotoController {
      */
     @PostMapping("/{tripId}/photos")
     @AuthCheck
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<TripPhotoVO> uploadPhoto(
+    public com.lq.travel.common.ResponseDTO<TripPhotoVO> uploadPhoto(
             @PathVariable Long tripId,
             @RequestParam String photoUrl,
             HttpServletRequest httpRequest) {
@@ -46,7 +46,7 @@ public class TripPhotoController {
      */
     @PostMapping("/{tripId}/photos/batch")
     @AuthCheck
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<List<TripPhotoVO>> uploadPhotos(
+    public com.lq.travel.common.ResponseDTO<List<TripPhotoVO>> uploadPhotos(
             @PathVariable Long tripId,
             @RequestBody List<String> photoUrls,
             HttpServletRequest httpRequest) {
@@ -60,7 +60,7 @@ public class TripPhotoController {
      */
     @GetMapping("/{tripId}/photos")
     @AuthCheck
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<List<TripPhotoVO>> getTripPhotos(
+    public com.lq.travel.common.ResponseDTO<List<TripPhotoVO>> getTripPhotos(
             @PathVariable Long tripId,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
@@ -73,7 +73,7 @@ public class TripPhotoController {
      */
     @DeleteMapping("/photos/{photoId}")
     @AuthCheck
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<Boolean> deletePhoto(
+    public com.lq.travel.common.ResponseDTO<Boolean> deletePhoto(
             @PathVariable Long photoId,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
@@ -81,4 +81,5 @@ public class TripPhotoController {
         return ResponseUtils.success(true);
     }
 }
+
 

@@ -6,7 +6,7 @@ import com.lq.travel.AI.core.constants.TimeoutConfig;
 import com.lq.travel.AI.core.model.AIRequest;
 import com.lq.travel.AI.core.model.AIResponse;
 import com.lq.travel.AI.core.model.AgentRequest;
-import com.lq.travel.AI.core.model.dto.ResponseDTO;
+import com.lq.travel.common.ResponseDTO;
 import com.lq.travel.AI.core.service.AIService;
 import com.lq.travel.AI.core.service.AgentService;
 import com.lq.travel.AI.core.service.AIMessageService;

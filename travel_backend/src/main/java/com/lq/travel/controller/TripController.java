@@ -40,7 +40,7 @@ public class TripController {
     @PostMapping("/generate")
     @AuthCheck
     @ApiRateLimit(name = "aiChat")
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<TripGenerateResponse> generateTrip(
+    public com.lq.travel.common.ResponseDTO<TripGenerateResponse> generateTrip(
             @RequestBody TripGenerateRequest request,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
@@ -53,7 +53,7 @@ public class TripController {
      */
     @PostMapping("/save")
     @AuthCheck
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<Long> saveTrip(
+    public com.lq.travel.common.ResponseDTO<Long> saveTrip(
             @RequestBody TripSaveRequest request,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
@@ -66,7 +66,7 @@ public class TripController {
      */
     @GetMapping("/my")
     @AuthCheck
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<List<TripVO>> getMyTrips(
+    public com.lq.travel.common.ResponseDTO<List<TripVO>> getMyTrips(
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
         List<TripVO> trips = tripService.getUserTrips(loginUser.getId());
@@ -78,7 +78,7 @@ public class TripController {
      */
     @GetMapping("/{id}")
     @AuthCheck
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<TripVO> getTripById(
+    public com.lq.travel.common.ResponseDTO<TripVO> getTripById(
             @PathVariable Long id,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
@@ -91,7 +91,7 @@ public class TripController {
      */
     @PostMapping("/{id}/complete")
     @AuthCheck
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<Boolean> completeTrip(
+    public com.lq.travel.common.ResponseDTO<Boolean> completeTrip(
             @PathVariable Long id,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
@@ -104,7 +104,7 @@ public class TripController {
      */
     @DeleteMapping("/{id}")
     @AuthCheck
-    public com.lq.travel.AI.core.model.dto.ResponseDTO<Boolean> deleteTrip(
+    public com.lq.travel.common.ResponseDTO<Boolean> deleteTrip(
             @PathVariable Long id,
             HttpServletRequest httpRequest) {
         User loginUser = userService.getLoginUser(httpRequest);
@@ -113,4 +113,5 @@ public class TripController {
     }
     
 }
+
 

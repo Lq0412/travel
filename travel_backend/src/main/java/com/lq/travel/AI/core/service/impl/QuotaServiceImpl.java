@@ -1,8 +1,7 @@
 package com.lq.travel.AI.core.service.impl;
 
+import com.lq.travel.AI.core.service.AIUserContextService;
 import com.lq.travel.AI.core.service.QuotaService;
-import com.lq.travel.model.entity.User;
-import com.lq.travel.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +22,7 @@ public class QuotaServiceImpl implements QuotaService {
     private RedisTemplate<String, Integer> redisTemplate;
     
     @Resource
-    private UserService userService;
+    private AIUserContextService aiUserContextService;
     
     /**
      * 配额检查开关
@@ -61,8 +60,7 @@ public class QuotaServiceImpl implements QuotaService {
         
         // 检查用户角色：管理员无配额限制
         try {
-            User user = userService.getById(userId);
-            if (user != null && "admin".equals(user.getUserRole())) {
+            if (aiUserContextService.isAdmin(userId)) {
                 log.info("管理员用户 {} 无配额限制，直接通过", userId);
                 return true;
             }

@@ -8,7 +8,7 @@
 package com.lq.travel.exception;
 
 
-import com.lq.travel.AI.core.model.dto.ResponseDTO;
+import com.lq.travel.common.ResponseDTO;
 import com.lq.travel.common.ResponseUtils;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -193,4 +193,5 @@ public class GlobalExceptionHandler {
         }
     }
 }
+
 
