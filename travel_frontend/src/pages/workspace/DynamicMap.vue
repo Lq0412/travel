@@ -83,12 +83,14 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
     if (!plan.activities) continue
 
     for (const activity of plan.activities) {
-      // Find latitude and longitude
-      const lon = activity.location?.longitude
-      const lat = activity.location?.latitude
+        // Find latitude and longitude with string-to-number fallback support
+        const rawLon = activity.location?.longitude
+        const rawLat = activity.location?.latitude
 
-      if (lon && lat && !isNaN(lon) && !isNaN(lat)) {
-        const pt: [number, number] = [lat, lon]
+        const lon = typeof rawLon === 'string' ? parseFloat(rawLon) : rawLon
+        const lat = typeof rawLat === 'string' ? parseFloat(rawLat) : rawLat
+
+        if (lon !== undefined && lat !== undefined && !isNaN(lon) && !isNaN(lat)) {
         coords.push(pt)
         
         // Add Marker with Custom CSS animation
