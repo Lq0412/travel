@@ -88,6 +88,33 @@ export async function syncMilvusKnowledge(
   })
 }
 
+/** 创建数据补齐任务 POST /ai/tasks/knowledge/ingest */
+export async function createKnowledgeIngestionTask(
+  data: {
+    query: string
+    dataSource?: 'AUTO' | 'TAVILY' | 'DASHSCOPE'
+    effectPreset?: 'FAST' | 'BALANCED' | 'DEEP'
+    maxItems?: number
+    mustContainStoreName?: boolean
+    maxRetry?: number
+  },
+  options?: { [key: string]: any }
+) {
+  return request<API.ResponseDTOMapStringObject>('/ai/tasks/knowledge/ingest', {
+    method: 'POST',
+    data,
+    ...(options || {}),
+  })
+}
+
+/** 查询任务状态 GET /ai/tasks/${taskId} */
+export async function getAiTaskStatus(taskId: string, options?: { [key: string]: any }) {
+  return request<API.ResponseDTOMapStringObject>(`/ai/tasks/${taskId}`, {
+    method: 'GET',
+    ...(options || {}),
+  })
+}
+
 /** 此处后端没有提供注释 POST /ai/monitor/quota/recharge */
 export async function rechargeQuota(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)

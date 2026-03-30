@@ -28,6 +28,10 @@ public class TaskMessageProducer {
         send(AiMqConstants.ROUTING_CHAT_SUMMARY, body);
     }
 
+    public void sendKnowledgeIngestionTask(Map<String, Object> body) {
+        send(AiMqConstants.ROUTING_KNOWLEDGE_INGESTION, body);
+    }
+
     private void send(String routingKey, Map<String, Object> body) {
         rabbitTemplate.convertAndSend(AiMqConstants.EXCHANGE_AI_TASK, routingKey, body);
         log.info("Sent task message, routingKey={}, payloadKeys={}", routingKey, body.keySet());

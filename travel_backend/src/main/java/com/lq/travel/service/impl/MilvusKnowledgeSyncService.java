@@ -1,16 +1,20 @@
 package com.lq.travel.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.lq.travel.config.RagProperties;
 import com.lq.travel.mapper.KnowledgeAttractionMapper;
+import com.lq.travel.mapper.KnowledgeExperienceMapper;
 import com.lq.travel.mapper.KnowledgeFoodMapper;
 import com.lq.travel.model.entity.KnowledgeAttraction;
+import com.lq.travel.model.entity.KnowledgeExperience;
 import com.lq.travel.model.entity.KnowledgeFood;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,12 +31,14 @@ public class MilvusKnowledgeSyncService {
 
     private static final long ATTRACTION_DOC_ID_OFFSET = 1_000_000_000L;
     private static final long FOOD_DOC_ID_OFFSET = 2_000_000_000L;
+    private static final long EXPERIENCE_DOC_ID_OFFSET = 3_000_000_000L;
 
     private final RagProperties ragProperties;
     private final DashScopeEmbeddingService embeddingService;
     private final MilvusRagClient milvusRagClient;
     private final KnowledgeAttractionMapper knowledgeAttractionMapper;
     private final KnowledgeFoodMapper knowledgeFoodMapper;
+    private final KnowledgeExperienceMapper knowledgeExperienceMapper;
 
     /**
      * 启动时按配置执行自动初始化或自动同步。
@@ -122,18 +128,20 @@ public class MilvusKnowledgeSyncService {
         int limitPerTable = Math.max(1, milvus.getSyncLimitPerTable());
         List<KnowledgeAttraction> attractions = loadAttractions(limitPerTable);
         List<KnowledgeFood> foods = loadFoods(limitPerTable);
+        List<KnowledgeExperience> experiences = loadExperiences(limitPerTable, recreateCollection);
 
         summary.put("collection", milvus.getCollection());
         summary.put("vectorField", milvus.getVectorField());
         summary.put("attractionRows", attractions.size());
         summary.put("foodRows", foods.size());
+        summary.put("experienceRows", experiences.size());
 
-        if (attractions.isEmpty() && foods.isEmpty()) {
+        if (attractions.isEmpty() && foods.isEmpty() && experiences.isEmpty()) {
             summary.put("reason", "knowledge_tables_empty");
             return summary;
         }
 
-        String probeText = pickProbeText(attractions, foods);
+        String probeText = pickProbeText(attractions, foods, experiences);
         List<Float> probeVector = embeddingService.embed(probeText);
         if (probeVector.isEmpty()) {
             summary.put("status", "failed");
@@ -150,7 +158,7 @@ public class MilvusKnowledgeSyncService {
             return summary;
         }
 
-        List<Map<String, Object>> documents = new ArrayList<>();
+        List<PreparedDoc> documents = new ArrayList<>();
         int embeddingFailures = 0;
 
         for (KnowledgeAttraction row : attractions) {
@@ -159,7 +167,7 @@ public class MilvusKnowledgeSyncService {
                 embeddingFailures++;
                 continue;
             }
-            documents.add(doc);
+            documents.add(new PreparedDoc(doc, null));
         }
 
         for (KnowledgeFood row : foods) {
@@ -168,7 +176,16 @@ public class MilvusKnowledgeSyncService {
                 embeddingFailures++;
                 continue;
             }
-            documents.add(doc);
+            documents.add(new PreparedDoc(doc, null));
+        }
+
+        for (KnowledgeExperience row : experiences) {
+            Map<String, Object> doc = buildExperienceDoc(row, milvus.getVectorField());
+            if (doc == null) {
+                embeddingFailures++;
+                continue;
+            }
+            documents.add(new PreparedDoc(doc, row.getId()));
         }
 
         summary.put("preparedDocs", documents.size());
@@ -183,12 +200,21 @@ public class MilvusKnowledgeSyncService {
         int batchSize = Math.max(1, milvus.getSyncBatchSize());
         int upserted = 0;
         int failedBatches = 0;
+        int syncedExperienceRows = 0;
         for (int i = 0; i < documents.size(); i += batchSize) {
             int end = Math.min(i + batchSize, documents.size());
-            List<Map<String, Object>> batch = documents.subList(i, end);
-            boolean ok = milvusRagClient.upsert(batch);
+            List<PreparedDoc> batch = documents.subList(i, end);
+            List<Map<String, Object>> payload = batch.stream().map(PreparedDoc::doc).toList();
+            boolean ok = milvusRagClient.upsert(payload);
             if (ok) {
-                upserted += batch.size();
+                upserted += payload.size();
+                List<Long> syncedIds = batch.stream()
+                        .map(PreparedDoc::experienceId)
+                        .filter(id -> id != null)
+                        .toList();
+                if (!syncedIds.isEmpty()) {
+                    syncedExperienceRows += markExperienceSynced(syncedIds);
+                }
             } else {
                 failedBatches++;
             }
@@ -196,6 +222,7 @@ public class MilvusKnowledgeSyncService {
 
         summary.put("batchSize", batchSize);
         summary.put("upsertedDocs", upserted);
+        summary.put("experienceSyncedRows", syncedExperienceRows);
         summary.put("failedBatches", failedBatches);
         summary.put("loaded", milvusRagClient.loadCollection());
 
@@ -212,7 +239,8 @@ public class MilvusKnowledgeSyncService {
     private List<KnowledgeAttraction> loadAttractions(int limit) {
         return knowledgeAttractionMapper.selectList(
                 new LambdaQueryWrapper<KnowledgeAttraction>()
-                        .orderByAsc(KnowledgeAttraction::getId)
+                        .orderByDesc(KnowledgeAttraction::getUpdatedAt)
+                        .orderByDesc(KnowledgeAttraction::getId)
                         .last("limit " + limit)
         );
     }
@@ -220,17 +248,35 @@ public class MilvusKnowledgeSyncService {
     private List<KnowledgeFood> loadFoods(int limit) {
         return knowledgeFoodMapper.selectList(
                 new LambdaQueryWrapper<KnowledgeFood>()
-                        .orderByAsc(KnowledgeFood::getId)
+                        .orderByDesc(KnowledgeFood::getId)
                         .last("limit " + limit)
         );
     }
 
-    private String pickProbeText(List<KnowledgeAttraction> attractions, List<KnowledgeFood> foods) {
+    private List<KnowledgeExperience> loadExperiences(int limit, boolean recreateCollection) {
+        LambdaQueryWrapper<KnowledgeExperience> wrapper = new LambdaQueryWrapper<KnowledgeExperience>()
+                .orderByDesc(KnowledgeExperience::getUpdateTime)
+                .orderByDesc(KnowledgeExperience::getId)
+                .last("limit " + limit);
+
+        if (!recreateCollection) {
+            wrapper.eq(KnowledgeExperience::getSyncStatus, 0);
+        }
+
+        return knowledgeExperienceMapper.selectList(wrapper);
+    }
+
+    private String pickProbeText(List<KnowledgeAttraction> attractions,
+                                 List<KnowledgeFood> foods,
+                                 List<KnowledgeExperience> experiences) {
         if (!attractions.isEmpty()) {
             return buildAttractionContent(attractions.get(0));
         }
         if (!foods.isEmpty()) {
             return buildFoodContent(foods.get(0));
+        }
+        if (!experiences.isEmpty()) {
+            return buildExperienceContent(experiences.get(0));
         }
         return "旅行知识库初始化探针文本";
     }
@@ -284,6 +330,31 @@ public class MilvusKnowledgeSyncService {
         return doc;
     }
 
+    private Map<String, Object> buildExperienceDoc(KnowledgeExperience row, String vectorField) {
+        if (row == null || row.getId() == null) {
+            return null;
+        }
+
+        String content = buildExperienceContent(row);
+        List<Float> vector = embeddingService.embed(content);
+        if (vector.isEmpty()) {
+            return null;
+        }
+
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("id", EXPERIENCE_DOC_ID_OFFSET + row.getId());
+        doc.put(vectorField, vector);
+        doc.put("title", defaultText(row.getTitle(), "经验补齐"));
+        doc.put("name", defaultText(row.getTitle(), "经验补齐"));
+        doc.put("content", content);
+        doc.put("source", defaultText(row.getPlatform(), "knowledge_experience"));
+        doc.put("city", extractCity(defaultText(row.getTags(), row.getContent())));
+        doc.put("category", "经验");
+        doc.put("kbType", "experience");
+        doc.put("updatedAt", toEpochMillis(row.getUpdateTime()));
+        return doc;
+    }
+
     private String buildAttractionContent(KnowledgeAttraction row) {
         return String.format(
                 Locale.ROOT,
@@ -312,6 +383,37 @@ public class MilvusKnowledgeSyncService {
         );
     }
 
+    private String buildExperienceContent(KnowledgeExperience row) {
+        return String.format(
+                Locale.ROOT,
+                "标题:%s；平台:%s；标签:%s；原文:%s；链接:%s",
+                defaultText(row.getTitle(), "经验补齐"),
+                defaultText(row.getPlatform(), "unknown"),
+                defaultText(row.getTags(), "暂无"),
+                defaultText(row.getContent(), "暂无"),
+                defaultText(row.getUrl(), "暂无")
+        );
+    }
+
+    private int markExperienceSynced(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        return knowledgeExperienceMapper.update(
+                null,
+                new LambdaUpdateWrapper<KnowledgeExperience>()
+                        .in(KnowledgeExperience::getId, ids)
+                        .set(KnowledgeExperience::getSyncStatus, 1)
+        );
+    }
+
+    private Long toEpochMillis(java.time.LocalDateTime dateTime) {
+        if (dateTime == null) {
+            return null;
+        }
+        return dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    }
+
     private String extractCity(String text) {
         if (!StringUtils.hasText(text)) {
             return "";
@@ -333,5 +435,8 @@ public class MilvusKnowledgeSyncService {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value.trim() : fallback;
+    }
+
+    private record PreparedDoc(Map<String, Object> doc, Long experienceId) {
     }
 }

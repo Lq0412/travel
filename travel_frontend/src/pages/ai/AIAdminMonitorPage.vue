@@ -1,434 +1,646 @@
-<template>
-  <div class="ai-admin-monitor-page">
-    <a-page-header
-      title="AI / Milvus 运行监控"
-      sub-title="支持手动同步知识库、查询可检索条数，并展示关键运行状态"
-      @back="() => $router.go(-1)"
-    >
-      <template #extra>
-        <a-space>
-          <a-input-number
-            v-model:value="queryLimit"
-            :min="1"
-            :max="5000"
-            :precision="0"
-            addon-before="limit"
-          />
-          <a-button type="primary" :loading="queryLoading || healthLoading" @click="refreshAll">
-            <template #icon><ReloadOutlined /></template>
-            刷新状态
-          </a-button>
-        </a-space>
-      </template>
-    </a-page-header>
-
-    <div class="monitor-content">
-      <!-- Status Cards Row -->
-      <a-row :gutter="[16, 16]" class="status-cards">
-        <a-col :xs="24" :lg="8">
-          <a-card :bordered="false" class="statistic-card">
-            <a-statistic :value="healthStatus" title="服务健康状态">
-              <template #prefix>
-                <HeartOutlined :style="{ color: healthDotColor }" />
-              </template>
-            </a-statistic>
-            <div class="card-footer">
-              <span class="secondary-text">{{ healthText }}</span>
-              <a-tag :color="healthDotColor">{{ healthStatus === 'UP' ? '正常' : (healthStatus === '--' ? '未加载' : '异常') }}</a-tag>
-            </div>
-          </a-card>
-        </a-col>
-
-        <a-col :xs="24" :lg="8">
-          <a-card :bordered="false" class="statistic-card">
-            <a-statistic :value="queryCountDisplay" title="Milvus 可查询条数">
-              <template #prefix>
-                <DatabaseOutlined :style="{ color: queryDotColor }" />
-              </template>
-              <template #suffix>条</template>
-            </a-statistic>
-            <div class="card-footer">
-              <span class="secondary-text">统计方式：{{ countByDisplay }}</span>
-            </div>
-          </a-card>
-        </a-col>
-
-        <a-col :xs="24" :lg="8">
-          <a-card :bordered="false" class="statistic-card">
-            <a-statistic :value="syncStatusText" title="最近同步状态">
-              <template #prefix>
-                <SyncOutlined :style="{ color: syncDotColor }" :spin="syncLoading" />
-              </template>
-            </a-statistic>
-            <div class="card-footer">
-              <span class="secondary-text">{{ syncSummaryText }}</span>
-            </div>
-          </a-card>
-        </a-col>
-      </a-row>
-
-      <!-- Detail Panels -->
-      <a-row :gutter="[16, 16]" class="detail-panels" type="flex">
-        <!-- 同步操作面板 -->
-        <a-col :xs="24" :xl="12" style="display: flex; flex-direction: column;">
-          <a-card title="知识库同步" :bordered="false" class="panel-card" style="flex: 1;">
-            <template #extra>
-              <a-space>
-                <a-switch v-model:checked="recreateCollection" checked-children="重建" un-checked-children="增量" />
-                <a-button type="primary" :loading="syncLoading" @click="handleSyncMilvus">
-                  <template #icon><CloudUploadOutlined /></template>
-                  触发同步
-                </a-button>
-              </a-space>
-            </template>
-            
-            <a-empty v-if="!lastSyncResult" description="暂无同步记录，请触发同步查看状态" />
-            <a-descriptions v-else bordered size="middle" :column="1">
-              <a-descriptions-item label="Status">
-                <a-tag :color="lastSyncResult.status === 'success' ? 'success' : (lastSyncResult.status === 'partial' ? 'warning' : 'error')">
-                  {{ lastSyncResult.status ?? '--' }}
-                </a-tag>
-              </a-descriptions-item>
-              <a-descriptions-item label="Collection">
-                {{ lastSyncResult.collection ?? '--' }}
-              </a-descriptions-item>
-              <a-descriptions-item label="Prepared Docs">
-                {{ lastSyncResult.preparedDocs ?? '0' }}
-              </a-descriptions-item>
-              <a-descriptions-item label="Upserted Docs">
-                <span style="color: #52c41a; font-weight: bold;">{{ lastSyncResult.upsertedDocs ?? '0' }}</span>
-              </a-descriptions-item>
-              <a-descriptions-item label="Failed Batches">
-                <span :style="{ color: Number(lastSyncResult.failedBatches) > 0 ? '#f5222d' : 'inherit' }">
-                  {{ lastSyncResult.failedBatches ?? '0' }}
-                </span>
-              </a-descriptions-item>
-              <a-descriptions-item label="Loaded">
-                <a-tag :color="lastSyncResult.loaded ? 'processing' : 'default'">{{ lastSyncResult.loaded ? 'Yes' : 'No' }}</a-tag>
-              </a-descriptions-item>
-            </a-descriptions>
-          </a-card>
-        </a-col>
-
-        <!-- 计数详情面板 -->
-        <a-col :xs="24" :xl="12" style="display: flex; flex-direction: column;">
-          <a-card title="查询监控详情" :bordered="false" class="panel-card" style="flex: 1;">
-            <a-empty v-if="!queryResult" description="暂无查询数据，请刷新获取" />
-            <div v-else>
-              <a-descriptions bordered size="middle" :column="{ xs: 1, sm: 2 }">
-                <a-descriptions-item label="Query Count">
-                  <span style="color: #1890ff; font-weight: bold; font-size: 16px;">{{ queryResult.queryCount ?? '--' }}</span>
-                </a-descriptions-item>
-                <a-descriptions-item label="Stats Row Count">
-                  {{ queryResult.statsRowCount ?? '--' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="Truncated" :span="2">
-                  <a-tag :color="queryResult.truncated ? 'warning' : 'blue'">
-                    {{ queryResult.truncated ? 'Yes (Reach Limit)' : 'No (Full Details)' }}
-                  </a-tag>
-                </a-descriptions-item>
-                <a-descriptions-item label="Limit" :span="1">
-                  {{ queryResult.limit ?? '--' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="Collection" :span="1">
-                  {{ queryResult.collection ?? '--' }}
-                </a-descriptions-item>
-                <a-descriptions-item label="Primary Field" :span="2">
-                  {{ queryResult.primaryField ?? '--' }}
-                </a-descriptions-item>
-              </a-descriptions>
-              
-              <div v-if="sampleIds.length > 0" class="sample-box">
-                <div class="sample-title">
-                  <DatabaseOutlined /> Sample IDs (Top 50)
-                </div>
-                <div class="sample-list">
-                  <a-tag color="cyan" v-for="item in sampleIds.slice(0, 50)" :key="item">{{ item }}</a-tag>
-                  <a-tag v-if="sampleIds.length > 50">...and {{ sampleIds.length - 50 }} more</a-tag>
-                </div>
-              </div>
-            </div>
-          </a-card>
-        </a-col>
-      </a-row>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { health, queryMilvusCount, syncMilvusKnowledge } from '@/api/monitoringController'
+import { ReloadOutlined, SyncOutlined, CheckCircleOutlined } from '@ant-design/icons-vue'
 import {
-  ReloadOutlined,
-  HeartOutlined,
-  DatabaseOutlined,
-  SyncOutlined,
-  CloudUploadOutlined
-} from '@ant-design/icons-vue'
-import { useRouter } from 'vue-router'
+  health, queryMilvusCount, syncMilvusKnowledge,
+  createKnowledgeIngestionTask, getAiTaskStatus
+} from '@/api/monitoringController'
 
-const router = useRouter()
+// -------------- 1. Milvus 层数据 --------------
+const milvusLoading = ref(false)
+const healthData = ref<Record<string, any>>({})
+const queryResult = ref<Record<string, any>>({})
 
-const queryLimit = ref(200)
-const recreateCollection = ref(false)
-
-const healthLoading = ref(false)
-const queryLoading = ref(false)
-const syncLoading = ref(false)
-
-const healthData = ref<Record<string, unknown> | null>(null)
-const queryResult = ref<Record<string, unknown> | null>(null)
-const lastSyncResult = ref<Record<string, unknown> | null>(null)
-
-const healthStatus = computed(() => {
-  if (!healthData.value) {
-    return '--'
-  }
-  return String(healthData.value.status ?? '--')
-})
-
-const healthText = computed(() => {
-  if (!healthData.value) {
-    return '尚未拉取健康状态'
-  }
-  const service = String(healthData.value.service ?? 'AI Module')
-  const timestamp = healthData.value.timestamp
-  if (!timestamp) {
-    return service
-  }
-  const date = new Date(Number(timestamp))
-  return `${service} · ${Number.isNaN(date.getTime()) ? '--' : date.toLocaleString()}`
-})
-
-const queryCountDisplay = computed(() => {
-  if (!queryResult.value) {
-    return '--'
-  }
-  return String(queryResult.value.queryCount ?? '--')
-})
-
-const countByDisplay = computed(() => {
-  if (!queryResult.value) {
-    return '--'
-  }
-  return String(queryResult.value.countBy ?? 'entities/query')
-})
-
-const syncStatusText = computed(() => {
-  if (!lastSyncResult.value) {
-    return '未执行'
-  }
-  return String(lastSyncResult.value.status ?? 'unknown')
-})
-
-const syncSummaryText = computed(() => {
-  if (!lastSyncResult.value) {
-    return '尚未触发同步任务，暂无汇总信息'
-  }
-  const upserted = String(lastSyncResult.value.upsertedDocs ?? '--')
-  const failedBatches = String(lastSyncResult.value.failedBatches ?? '--')
-  return `Upserted: ${upserted} 篇，Failed: ${failedBatches} 批次`
-})
-
-const healthDotColor = computed(() => {
-  const value = healthStatus.value.toLowerCase()
-  if (value === 'up') return '#52c41a'
-  if (value === '--') return '#bfbfbf'
-  return '#f5222d'
-})
-
-const queryDotColor = computed(() => {
-  if (!queryResult.value) return '#bfbfbf'
-  const status = String(queryResult.value.status ?? '').toLowerCase()
-  if (status === 'success') return '#1890ff'
-  if (status === 'failed') return '#f5222d'
-  return '#bfbfbf'
-})
-
-const syncDotColor = computed(() => {
-  if (!lastSyncResult.value) return '#bfbfbf'
-  const status = String(lastSyncResult.value.status ?? '').toLowerCase()
-  if (status === 'success' || status === 'partial') return '#52c41a'
-  if (status === 'failed') return '#f5222d'
-  return '#bfbfbf'
-})
-
-const sampleIds = computed(() => {
-  const raw = queryResult.value?.sampleIds
-  return Array.isArray(raw) ? raw.map((item) => String(item)) : []
-})
-
-async function refreshHealth() {
-  healthLoading.value = true
+async function fetchMilvusData() {
+  milvusLoading.value = true
   try {
-    const res = await health()
-    if (res.data.code !== 0 || !res.data.data) {
-      throw new Error(res.data.message || '健康检查失败')
-    }
-    healthData.value = res.data.data
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : '健康检查失败'
-    message.error(msg)
+    const [h, q] = await Promise.all([health(), queryMilvusCount({ limit: 1 })])
+    healthData.value = h.data?.data || {}
+    queryResult.value = q.data?.data || {}
+  } catch (e) {
+    message.error('获取Milvus表盘数据失败')
   } finally {
-    healthLoading.value = false
+    milvusLoading.value = false
   }
 }
 
-async function refreshQueryCount() {
-  queryLoading.value = true
+// -------------- 2. 任务流表单与记录层 --------------
+interface TaskRecord {
+  taskId: string
+  query: string
+  dataSource: string
+  effectPreset: string
+  createTime: string
+  status: string
+  withSync: boolean
+  syncTriggered: boolean
+}
+
+interface SummaryCard {
+  label: string
+  value: string | number
+}
+
+const effectPresetLabels: Record<'FAST' | 'BALANCED' | 'DEEP', string> = {
+  FAST: '低',
+  BALANCED: '中',
+  DEEP: '高',
+}
+
+// 重聚表单参数配置
+const taskForm = ref({
+  query: '',
+  dataSource: 'AUTO' as 'AUTO' | 'TAVILY' | 'DASHSCOPE',
+  effectPreset: 'BALANCED' as 'FAST' | 'BALANCED' | 'DEEP',
+  maxItems: 10,
+  maxRetry: 3,
+  mustContainStoreName: true,
+  withSync: true
+})
+
+const submitting = ref(false)
+const taskRecords = ref<TaskRecord[]>([])
+const refreshingList = ref(false)
+const autoSyncing = ref(false)
+
+const TERMINAL_TASK_STATUS = new Set(['SUCCESS', 'FAILED', 'CANCELLED'])
+let pollingTimer: number | null = null
+
+const activeTaskCount = computed(
+  () => taskRecords.value.filter((task) => !['SUCCESS', 'FAILED', 'CANCELLED'].includes((task.status || '').toUpperCase())).length
+)
+
+const summaryCards = computed<SummaryCard[]>(() => [
+  {
+    label: 'Milvus 健康度',
+    value: healthData.value.status || '--',
+  },
+  {
+    label: '知识库向量总数',
+    value: queryResult.value.statsRowCount ?? queryResult.value.queryCount ?? '0',
+  },
+  {
+    label: '未完结任务',
+    value: activeTaskCount.value,
+  },
+])
+
+const columns = [
+  { title: '流水线 ID (Task ID)', key: 'taskId', width: 200 },
+  { title: '指令目标 (Query)', key: 'query', ellipsis: true },
+  { title: '策略配置', key: 'settings', width: 160 },
+  { title: '下发时间', dataIndex: 'createTime', key: 'createTime', width: 170 },
+  { title: '执行终态', key: 'status', width: 120 },
+  { title: '入库同步', key: 'syncAction', width: 160 },
+  { title: '动作', key: 'action', width: 160, align: 'center' }
+]
+
+function loadRecordsFromLocal() {
   try {
-    const res = await queryMilvusCount({ limit: queryLimit.value })
-    if (res.data.code !== 0 || !res.data.data) {
-      throw new Error(res.data.message || '查询条数失败')
-    }
-    queryResult.value = res.data.data
-    if (String(res.data.data.status ?? '').toLowerCase() !== 'success') {
-      message.warning('Milvus 查询返回非成功状态，请查看详情')
-    }
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : '查询条数失败'
-    message.error(msg)
-  } finally {
-    queryLoading.value = false
+    const raw = localStorage.getItem('AI_TASK_RECORDS_V3')
+    if (!raw) return
+
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return
+
+    taskRecords.value = parsed
+      .filter((item) => item && typeof item === 'object')
+      .map((item) => {
+        const row = item as Partial<TaskRecord>
+        return {
+          taskId: String(row.taskId || ''),
+          query: String(row.query || ''),
+          dataSource: String(row.dataSource || 'AUTO'),
+          effectPreset: String(row.effectPreset || 'BALANCED'),
+          createTime: String(row.createTime || new Date().toLocaleString()),
+          status: String(row.status || 'PENDING'),
+          withSync: row.withSync !== false,
+          syncTriggered: Boolean(row.syncTriggered),
+        }
+      })
+      .filter((row) => row.taskId)
+  } catch (e) {}
+}
+
+function saveRecordsToLocal() {
+  localStorage.setItem('AI_TASK_RECORDS_V3', JSON.stringify(taskRecords.value))
+}
+
+function getStatusColor(status: string) {
+  const s = (status || '').toUpperCase()
+  if (s === 'SUCCESS') return 'success'
+  if (s === 'FAILED' || s === 'CANCELLED') return 'error'
+  if (s === 'RUNNING' || s === 'PENDING') return 'processing'
+  return 'default'
+}
+
+function formatEffectPreset(preset: string) {
+  const code = (preset || '').toUpperCase() as keyof typeof effectPresetLabels
+  return effectPresetLabels[code] || preset || '--'
+}
+
+function isTerminalStatus(status: string) {
+  return TERMINAL_TASK_STATUS.has((status || '').toUpperCase())
+}
+
+function getRecord(taskId: string) {
+  return taskRecords.value.find((item) => item.taskId === taskId)
+}
+
+async function triggerSyncAfterSuccess(record: TaskRecord) {
+  if (record.syncTriggered) {
+    return
   }
-}
 
-async function refreshAll() {
-  await Promise.all([refreshHealth(), refreshQueryCount()]);
-  message.success('状态已刷新');
-}
+  // 点击手动入库时，确保状态已更新
+  record.withSync = true
+  record.syncTriggered = true
+  saveRecordsToLocal()
 
-async function handleSyncMilvus() {
-  syncLoading.value = true
+  autoSyncing.value = true
   try {
-    const res = await syncMilvusKnowledge({ recreateCollection: recreateCollection.value })
-    if (res.data.code !== 0 || !res.data.data) {
-      throw new Error(res.data.message || '同步执行失败')
-    }
-    lastSyncResult.value = res.data.data
-    const status = String(res.data.data.status ?? '').toLowerCase()
-    if (status === 'success' || status === 'partial') {
-      message.success('Milvus 同步执行完成')
-    } else {
-      message.warning(`Milvus 同步结束，状态: ${status || 'unknown'}`)
-    }
-    await refreshQueryCount()
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : '同步执行失败'
-    message.error(msg)
+    await syncMilvusKnowledge({ recreateCollection: false })
+    message.success('已成功触发知识库入库同步')
+    await fetchMilvusData()
+  } catch (e) {
+    record.syncTriggered = false
+    saveRecordsToLocal()
+    message.warning('同步触发失败，可再次手动尝试')
   } finally {
-    syncLoading.value = false
+    autoSyncing.value = false
   }
 }
 
-onMounted(async () => {
-  await Promise.all([refreshHealth(), refreshQueryCount()])
+async function submitTask() {
+  if (!taskForm.value.query.trim()) return message.warning('请填写指令目标 (Query)')
+  submitting.value = true
+  try {
+    // 提交主任务 - 携带所有参数配置
+    const res = await createKnowledgeIngestionTask({
+      query: taskForm.value.query,
+      dataSource: taskForm.value.dataSource,
+      effectPreset: taskForm.value.effectPreset,
+      maxItems: taskForm.value.maxItems,
+      maxRetry: taskForm.value.maxRetry,
+      mustContainStoreName: taskForm.value.mustContainStoreName
+    })
+    
+    const taskId = String(res.data?.data?.taskId || '')
+    const deduplicated = Boolean(res.data?.data?.deduplicated)
+    const returnedStatus = String(res.data?.data?.status || 'PENDING')
+
+    if (taskId) {
+      const existing = getRecord(taskId)
+      if (existing) {
+        existing.query = taskForm.value.query
+        existing.dataSource = taskForm.value.dataSource
+        existing.effectPreset = taskForm.value.effectPreset
+        existing.status = returnedStatus
+        existing.withSync = taskForm.value.withSync
+      } else {
+        taskRecords.value.unshift({
+          taskId,
+          query: taskForm.value.query,
+          dataSource: taskForm.value.dataSource,
+          effectPreset: taskForm.value.effectPreset,
+          createTime: new Date().toLocaleString(),
+          status: returnedStatus,
+          withSync: taskForm.value.withSync,
+          syncTriggered: false,
+        })
+      }
+
+      if (deduplicated) {
+        message.info('检测到相同参数任务，已复用已有任务')
+      } else {
+        message.success('流水线下发成功')
+      }
+
+      saveRecordsToLocal()
+
+      // 清空输入框保留配置
+      taskForm.value.query = ''
+      await refreshSingleTask(taskId, { silent: true, triggerAutoSync: true })
+      startStatusPolling()
+    }
+  } catch (e) {
+    message.error('推送流水线任务失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function refreshSingleTask(
+  taskId: string,
+  options: { silent?: boolean; triggerAutoSync?: boolean } = {}
+) {
+  const { silent = false, triggerAutoSync = false } = options
+
+  try {
+    const res = await getAiTaskStatus(taskId)
+    const target = getRecord(taskId)
+    if (target && res.data?.data) {
+      target.status = String(res.data.data.status || target.status)
+
+      if (triggerAutoSync && (target.status || '').toUpperCase() === 'SUCCESS') {
+        if (target.withSync && !target.syncTriggered) {
+          await triggerSyncAfterSuccess(target)
+        }
+      }
+
+      saveRecordsToLocal()
+    }
+  } catch (e) {
+    if (!silent) {
+      message.warning(`更新任务 ${taskId} 状态失败`)
+    }
+  }
+}
+
+function startStatusPolling() {
+  if (pollingTimer) {
+    window.clearInterval(pollingTimer)
+  }
+
+  pollingTimer = window.setInterval(() => {
+    const pendingTasks = taskRecords.value.filter((task) => !isTerminalStatus(task.status))
+    if (!pendingTasks.length) {
+      stopStatusPolling()
+      return
+    }
+
+    void Promise.all(
+      pendingTasks.map((task) => refreshSingleTask(task.taskId, { silent: true, triggerAutoSync: true }))
+    )
+  }, 4000)
+}
+
+function stopStatusPolling() {
+  if (pollingTimer) {
+    window.clearInterval(pollingTimer)
+    pollingTimer = null
+  }
+}
+
+async function refreshAllTasks() {
+  if (!taskRecords.value.length) return
+  refreshingList.value = true
+  try {
+    const pendings = taskRecords.value.filter(t => 
+      !['SUCCESS', 'FAILED', 'CANCELLED'].includes((t.status||'').toUpperCase())
+    )
+    if (!pendings.length) {
+      message.info('列表中没有未完结的任务需要溯源')
+      refreshingList.value = false
+      return
+    }
+
+    await Promise.all(pendings.map(t => refreshSingleTask(t.taskId, { silent: true, triggerAutoSync: true })))
+    message.success('非终态任务刷新完毕')
+  } finally {
+    refreshingList.value = false
+  }
+}
+
+function removeRecord(taskId: string) {
+  taskRecords.value = taskRecords.value.filter(t => t.taskId !== taskId)
+  saveRecordsToLocal()
+}
+
+onMounted(() => {
+  fetchMilvusData()
+  loadRecordsFromLocal()
+  const pendingTasks = taskRecords.value.filter((task) => !isTerminalStatus(task.status))
+  if (pendingTasks.length) {
+    startStatusPolling()
+    void Promise.all(
+      pendingTasks.map((task) => refreshSingleTask(task.taskId, { silent: true, triggerAutoSync: true }))
+    )
+  }
+})
+
+onBeforeUnmount(() => {
+  stopStatusPolling()
 })
 </script>
 
-<style scoped>
-.ai-admin-monitor-page {
-  /* Give enough space and look crisp */
-}
+<template>
+  <div class="ai-monitor-page">
+    <section class="page-header">
+      <div>
+        <p class="eyebrow">AI 监控中心</p>
+        <h1>AI 调度与监控控制台</h1>
+        <p>监控概览、流水线调度、状态追踪都放在同一页内，尽量保持操作路径短。</p>
+      </div>
 
-.monitor-content {
-  padding: 0 24px 24px;
-}
+      <div class="header-actions">
+        <a-button type="primary" @click="fetchMilvusData" :loading="milvusLoading">
+          <template #icon><ReloadOutlined /></template>
+          刷新数据
+        </a-button>
+      </div>
+    </section>
 
-.status-cards {
-  margin-bottom: 24px;
-}
+    <section class="summary-grid">
+      <div v-for="card in summaryCards" :key="card.label" class="summary-card">
+        <strong>{{ card.value }}</strong>
+        <span>{{ card.label }}</span>
+      </div>
+    </section>
 
-.statistic-card {
-  border-radius: 12px;
-  background: white;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-  transition: all 0.3s ease;
-}
+    <section class="panel-grid">
+      <a-card class="panel-card" title="新建数据补齐流水线" :bordered="false">
+        <a-form layout="vertical">
+          <a-form-item label="任务意图目标 (Query)" required>
+            <a-input-search
+              v-model:value="taskForm.query"
+              placeholder="例：杭州西湖两天一夜避坑游..."
+              enter-button="提交并执行"
+              @search="submitTask"
+              :loading="submitting"
+            />
+          </a-form-item>
 
-.statistic-card:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
-}
+          <div class="form-grid">
+            <a-form-item label="真实来源">
+              <a-select v-model:value="taskForm.dataSource">
+                <a-select-option value="AUTO">AUTO</a-select-option>
+                <a-select-option value="TAVILY">TAVILY</a-select-option>
+                <a-select-option value="DASHSCOPE">DASHSCOPE</a-select-option>
+              </a-select>
+            </a-form-item>
 
-.statistic-card :deep(.ant-card-body) {
-  padding: 24px 24px 20px 24px;
-}
+            <a-form-item label="提取深度策略">
+              <a-select v-model:value="taskForm.effectPreset">
+                <a-select-option value="FAST">低</a-select-option>
+                <a-select-option value="BALANCED">中</a-select-option>
+                <a-select-option value="DEEP">高</a-select-option>
+              </a-select>
+            </a-form-item>
 
-.statistic-card :deep(.ant-statistic-title) {
-  font-size: 15px;
-  color: #5c6b77;
-  font-weight: 500;
-  margin-bottom: 12px;
-}
+            <a-form-item label="爬取限制数">
+              <a-input-number v-model:value="taskForm.maxItems" :min="1" :max="50" />
+            </a-form-item>
 
-.statistic-card :deep(.ant-statistic-content) {
-  font-size: 28px;
-  font-weight: 600;
-  color: #1e293b;
-}
+            <a-form-item label="异常重试次数">
+              <a-input-number v-model:value="taskForm.maxRetry" :min="0" :max="10" />
+            </a-form-item>
 
-.card-footer {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid #f0f2f5;
+            <a-form-item label="执行后级联配置" class="form-wide">
+              <div class="checkbox-group">
+                <a-checkbox v-model:checked="taskForm.mustContainStoreName">强制门店名</a-checkbox>
+                <a-checkbox v-model:checked="taskForm.withSync">执行完自动入库</a-checkbox>
+              </div>
+            </a-form-item>
+          </div>
+        </a-form>
+      </a-card>
+
+      <a-card class="panel-card" title="本机执行追踪记录" :bordered="false">
+        <template #extra>
+          <a-button size="small" type="primary" ghost @click="refreshAllTasks" :loading="refreshingList">
+            <template #icon><SyncOutlined /></template>
+            批量刷新
+          </a-button>
+        </template>
+
+        <a-table
+          :dataSource="taskRecords"
+          :columns="columns"
+          rowKey="taskId"
+          size="middle"
+          :scroll="{ x: 980 }"
+          :pagination="{ pageSize: 10 }"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'taskId'">
+              <span class="task-id">{{ record.taskId }}</span>
+            </template>
+            <template v-if="column.key === 'query'">
+              <span class="task-query">{{ record.query }}</span>
+            </template>
+            <template v-if="column.key === 'settings'">
+              <span class="task-settings">{{ record.dataSource }} / {{ formatEffectPreset(record.effectPreset) }}</span>
+            </template>
+            <template v-if="column.key === 'status'">
+              <a-tag :color="getStatusColor(record.status)">{{ record.status || '获取中' }}</a-tag>
+            </template>
+            <template v-if="column.key === 'syncAction'">
+              <template v-if="!isTerminalStatus(record.status)">
+                <a-switch
+                  v-model:checked="record.withSync"
+                  checked-children="自动入库"
+                  un-checked-children="手动触发"
+                  size="small"
+                  @change="saveRecordsToLocal"
+                />
+              </template>
+              <template v-else-if="(record.status || '').toUpperCase() === 'SUCCESS'">
+                <span v-if="record.syncTriggered" style="color: #52c41a">
+                  <CheckCircleOutlined /> 已触发入库
+                </span>
+                <a-button
+                  v-else
+                  size="small"
+                  type="link"
+                  @click="triggerSyncAfterSuccess(record)"
+                  :loading="autoSyncing"
+                >
+                  <SyncOutlined /> 立即入库
+                </a-button>
+              </template>
+              <template v-else>
+                <span style="color: #999">--</span>
+              </template>
+            </template>
+            <template v-if="column.key === 'action'">
+              <div class="action-cell">
+                <a-button type="link" size="small" @click="refreshSingleTask(record.taskId, { triggerAutoSync: true })">状态溯源</a-button>
+                <a-popconfirm title="确定抹除这条流水线发起记录吗？" @confirm="removeRecord(record.taskId)">
+                  <a-button type="link" size="small" danger>清除记录</a-button>
+                </a-popconfirm>
+              </div>
+            </template>
+          </template>
+        </a-table>
+      </a-card>
+    </section>
+  </div>
+</template>
+
+<style scoped lang="scss">
+.ai-monitor-page {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 22px;
 }
 
-.card-footer .secondary-text {
-  color: #8492a6;
+.page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 24px;
+  padding: 28px 30px;
+  border-radius: 28px;
+  border: 1px solid rgba(15, 28, 46, 0.08);
+  background: #ffffff;
+}
+
+.eyebrow {
+  margin: 0;
   font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 70%;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--primary-600);
 }
 
-.detail-panels {
-  /* flex to align children heights if possible */
-  align-items: stretch;
+.page-header h1 {
+  margin: 8px 0 10px;
+  font-size: 34px;
+  color: var(--color-text);
+}
+
+.page-header p {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.summary-card {
+  padding: 20px 22px;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 28, 46, 0.08);
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(18, 52, 97, 0.05);
+
+  strong {
+    display: block;
+    font-size: 30px;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  span {
+    color: var(--color-muted);
+  }
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr);
+  gap: 16px;
 }
 
 .panel-card {
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  border-radius: 24px;
+  border: 1px solid rgba(15, 28, 46, 0.08);
+  box-shadow: 0 16px 40px rgba(18, 52, 97, 0.05);
 }
 
-.panel-card :deep(.ant-card-head-title) {
-  font-weight: 600;
-  font-size: 16px;
+.panel-card :deep(.ant-card-body) {
+  padding: 22px;
 }
 
-.sample-box {
-  margin-top: 16px;
-  padding: 16px;
-  background: #f8fafc;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
-.sample-title {
-  font-size: 14px;
-  color: #475569;
-  margin-bottom: 14px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.form-wide {
+  grid-column: 1 / -1;
 }
 
-.sample-list {
+.checkbox-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 16px 20px;
+  padding-top: 2px;
 }
 
-:deep(.ant-page-header) {
-  padding-left: 24px;
-  padding-right: 24px;
-  background-color: transparent;
+.task-id,
+.task-settings {
+  font-size: 12px;
+  color: var(--color-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.task-query {
+  display: block;
+  min-width: 0;
+  font-weight: 500;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.action-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+:deep(.ant-form-item-label > label) {
+  color: #596579;
+  font-weight: 500;
+}
+
+:deep(.ant-input),
+:deep(.ant-select-selector),
+:deep(.ant-input-number) {
+  width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .page-header,
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-wide {
+    grid-column: auto;
+  }
+
+  .page-header {
+    align-items: start;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    padding: 22px 20px;
+  }
+
+  .page-header h1 {
+    font-size: 28px;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-actions {
+    justify-content: flex-start;
+  }
 }
 </style>

@@ -33,6 +33,10 @@ digital-human:
   python-service-url: http://localhost:8888  # Python数字人服务地址
 
 ai:
+  search:
+    tavily:
+      api-key: ${TAVILY_API_KEY:}
+      endpoint: ${TAVILY_ENDPOINT:https://api.tavily.com/search}
   rag:
     enabled: true
     top-k: 6

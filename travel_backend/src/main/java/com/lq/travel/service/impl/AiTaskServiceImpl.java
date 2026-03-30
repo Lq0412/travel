@@ -32,7 +32,11 @@ public class AiTaskServiceImpl extends ServiceImpl<AiTaskMapper, AiTask> impleme
         if (StringUtils.hasText(bizKey)) {
             Optional<AiTask> existing = findByBizKey(bizKey);
             if (existing.isPresent()) {
-                return existing.get();
+                AiTask existingTask = existing.get();
+                // FAILED 任务允许重新创建，避免前一次失败后被幂等逻辑永久“锁死”
+                if (!STATUS_FAILED.equals(existingTask.getStatus())) {
+                    return existingTask;
+                }
             }
         }
 
@@ -100,7 +104,7 @@ public class AiTaskServiceImpl extends ServiceImpl<AiTaskMapper, AiTask> impleme
             task.setStatus(STATUS_FAILED);
             task.setErrorMessage(errorMessage);
             Integer retry = task.getRetryCount() == null ? 0 : task.getRetryCount();
-            task.setRetryCount(retry);
+            task.setRetryCount(retry + 1);
             return this.updateById(task);
         }).orElse(false);
     }

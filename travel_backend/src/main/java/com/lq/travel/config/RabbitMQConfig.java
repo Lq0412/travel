@@ -75,6 +75,19 @@ public class RabbitMQConfig {
         return QueueBuilder.durable(AiMqConstants.QUEUE_CHAT_SUMMARY_DLQ).build();
     }
 
+    @Bean
+    public Queue knowledgeIngestionQueue() {
+        return QueueBuilder.durable(AiMqConstants.QUEUE_KNOWLEDGE_INGESTION)
+                .withArgument("x-dead-letter-exchange", AiMqConstants.EXCHANGE_AI_TASK_DLX)
+                .withArgument("x-dead-letter-routing-key", AiMqConstants.ROUTING_KNOWLEDGE_INGESTION)
+                .build();
+    }
+
+    @Bean
+    public Queue knowledgeIngestionDlq() {
+        return QueueBuilder.durable(AiMqConstants.QUEUE_KNOWLEDGE_INGESTION_DLQ).build();
+    }
+
     // ========== 绑定 ==========
     @Bean
     public Binding tripPlanBinding(Queue tripPlanQueue, DirectExchange aiTaskExchange) {
@@ -102,5 +115,19 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(chatSummaryDlq)
                 .to(aiTaskDlx)
                 .with(AiMqConstants.ROUTING_CHAT_SUMMARY);
+    }
+
+    @Bean
+    public Binding knowledgeIngestionBinding(Queue knowledgeIngestionQueue, DirectExchange aiTaskExchange) {
+        return BindingBuilder.bind(knowledgeIngestionQueue)
+                .to(aiTaskExchange)
+                .with(AiMqConstants.ROUTING_KNOWLEDGE_INGESTION);
+    }
+
+    @Bean
+    public Binding knowledgeIngestionDlqBinding(Queue knowledgeIngestionDlq, DirectExchange aiTaskDlx) {
+        return BindingBuilder.bind(knowledgeIngestionDlq)
+                .to(aiTaskDlx)
+                .with(AiMqConstants.ROUTING_KNOWLEDGE_INGESTION);
     }
 }

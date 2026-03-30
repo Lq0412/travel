@@ -3,9 +3,11 @@ package com.lq.travel.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.lq.travel.config.RagProperties;
 import com.lq.travel.mapper.KnowledgeAttractionMapper;
+import com.lq.travel.mapper.KnowledgeExperienceMapper;
 import com.lq.travel.mapper.KnowledgeFoodMapper;
 import com.lq.travel.model.dto.ai.RagChunk;
 import com.lq.travel.model.entity.KnowledgeAttraction;
+import com.lq.travel.model.entity.KnowledgeExperience;
 import com.lq.travel.model.entity.KnowledgeFood;
 import com.lq.travel.model.enums.IntentType;
 import com.lq.travel.service.TravelRagService;
@@ -37,6 +39,7 @@ public class TravelRagServiceImpl implements TravelRagService {
     private final MilvusRagClient milvusRagClient;
     private final KnowledgeAttractionMapper knowledgeAttractionMapper;
     private final KnowledgeFoodMapper knowledgeFoodMapper;
+    private final KnowledgeExperienceMapper knowledgeExperienceMapper;
 
     @Override
     public String buildRagContext(String userQuery, String destinationHint, IntentType intent) {
@@ -86,6 +89,7 @@ public class TravelRagServiceImpl implements TravelRagService {
         List<RagChunk> candidates = new ArrayList<>();
         candidates.addAll(searchAttractions(tokens, destinationHint));
         candidates.addAll(searchFoods(tokens, destinationHint));
+        candidates.addAll(searchExperiences(tokens, destinationHint));
 
         return candidates.stream()
                 .sorted(Comparator.comparingDouble(this::safeScore).reversed())
@@ -138,6 +142,29 @@ public class TravelRagServiceImpl implements TravelRagService {
         }
     }
 
+    private List<RagChunk> searchExperiences(List<String> tokens, String destinationHint) {
+        try {
+            List<KnowledgeExperience> rows = knowledgeExperienceMapper.selectList(
+                    new LambdaQueryWrapper<KnowledgeExperience>()
+                            .orderByDesc(KnowledgeExperience::getUpdateTime)
+                            .last("limit 200")
+            );
+
+            List<RagChunk> result = new ArrayList<>();
+            for (KnowledgeExperience row : rows) {
+                double score = scoreExperience(row, tokens, destinationHint);
+                if (score <= 0.1D) {
+                    continue;
+                }
+                result.add(toExperienceChunk(row, score));
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("本地经验知识库检索失败: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
     private RagChunk toAttractionChunk(KnowledgeAttraction row, double score) {
         String content = String.format(
                 Locale.ROOT,
@@ -178,6 +205,25 @@ public class TravelRagServiceImpl implements TravelRagService {
                 .build();
     }
 
+    private RagChunk toExperienceChunk(KnowledgeExperience row, double score) {
+        String content = String.format(
+                Locale.ROOT,
+                "经验:%s；平台:%s；标签:%s；内容:%s；链接:%s",
+                defaultText(row.getTitle(), "经验补齐"),
+                defaultText(row.getPlatform(), "unknown"),
+                defaultText(row.getTags(), "暂无"),
+                defaultText(row.getContent(), "暂无"),
+                defaultText(row.getUrl(), "暂无")
+        );
+
+        return RagChunk.builder()
+                .title(defaultText(row.getTitle(), "经验补齐"))
+                .source("mysql-knowledge-experience")
+                .content(content)
+                .score(score)
+                .build();
+    }
+
     private double scoreAttraction(KnowledgeAttraction row, List<String> tokens, String destinationHint) {
         double score = 0D;
         score += hitScore(row.getName(), tokens, 2.8D);
@@ -209,6 +255,21 @@ public class TravelRagServiceImpl implements TravelRagService {
 
         if (StringUtils.hasText(destinationHint)) {
             score += hitScore(defaultText(row.getWhereToEat(), "") + " " + defaultText(row.getName(), ""),
+                    List.of(destinationHint.trim()), 1.8D);
+        }
+
+        return score;
+    }
+
+    private double scoreExperience(KnowledgeExperience row, List<String> tokens, String destinationHint) {
+        double score = 0D;
+        score += hitScore(row.getTitle(), tokens, 2.2D);
+        score += hitScore(row.getContent(), tokens, 1.8D);
+        score += hitScore(row.getTags(), tokens, 1.4D);
+        score += hitScore(row.getPlatform(), tokens, 0.8D);
+
+        if (StringUtils.hasText(destinationHint)) {
+            score += hitScore(defaultText(row.getTitle(), "") + " " + defaultText(row.getContent(), ""),
                     List.of(destinationHint.trim()), 1.8D);
         }
 

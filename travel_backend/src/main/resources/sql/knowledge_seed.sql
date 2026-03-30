@@ -58,6 +58,24 @@ CREATE TABLE IF NOT EXISTS `knowledge_food` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='美食知识库';
 
 -- =============================
+-- 经验补齐知识表
+-- =============================
+CREATE TABLE IF NOT EXISTS `knowledge_experience` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `platform` VARCHAR(64) DEFAULT NULL COMMENT '来源平台，如 tavily / dashscope',
+  `title` VARCHAR(255) DEFAULT NULL COMMENT '标题',
+  `content` MEDIUMTEXT COMMENT '经验正文',
+  `tags` VARCHAR(512) DEFAULT NULL COMMENT '标签，逗号分隔',
+  `url` VARCHAR(512) DEFAULT NULL COMMENT '原始链接',
+  `sync_status` TINYINT NOT NULL DEFAULT 0 COMMENT '同步状态：0未同步，1已同步',
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_sync_status_update` (`sync_status`, `update_time`),
+  KEY `idx_platform` (`platform`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='经验补齐知识库';
+
+-- =============================
 -- 幂等处理：先删后插（按名称）
 -- =============================
 DELETE FROM `knowledge_attraction` WHERE `name` IN (

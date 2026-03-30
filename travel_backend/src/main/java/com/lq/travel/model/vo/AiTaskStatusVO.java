@@ -12,6 +12,7 @@ public class AiTaskStatusVO {
     private String taskId;
     private String type;
     private String status;
+    private String payload;
     private String result;
     private String errorMessage;
     private Integer retryCount;
