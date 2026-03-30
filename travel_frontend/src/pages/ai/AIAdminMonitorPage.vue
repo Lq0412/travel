@@ -1,12 +1,11 @@
 <template>
   <div class="ai-admin-monitor-page">
-    <section class="monitor-hero">
-      <div>
-        <p class="eyebrow">Admin Console</p>
-        <h1>AI / Milvus 运行监控</h1>
-        <p class="subtitle">支持手动同步知识库、查询可检索条数，并展示关键运行状态。</p>
-      </div>
-      <div class="hero-actions">
+    <a-page-header
+      title="AI / Milvus 运行监控"
+      sub-title="支持手动同步知识库、查询可检索条数，并展示关键运行状态"
+      @back="() => $router.go(-1)"
+    >
+      <template #extra>
         <a-space>
           <a-input-number
             v-model:value="queryLimit"
@@ -15,110 +14,144 @@
             :precision="0"
             addon-before="limit"
           />
-          <a-button :loading="queryLoading" @click="refreshQueryCount">刷新条数</a-button>
-        </a-space>
-      </div>
-    </section>
-
-    <section class="status-grid">
-      <article class="status-card">
-        <header>
-          <span class="dot" :class="healthDotClass" />
-          <h3>服务健康</h3>
-        </header>
-        <p class="primary-value">{{ healthStatus }}</p>
-        <p class="secondary">{{ healthText }}</p>
-      </article>
-
-      <article class="status-card">
-        <header>
-          <span class="dot" :class="queryDotClass" />
-          <h3>Milvus 可查询条数</h3>
-        </header>
-        <p class="primary-value">{{ queryCountDisplay }}</p>
-        <p class="secondary">统计方式：{{ countByDisplay }}</p>
-      </article>
-
-      <article class="status-card">
-        <header>
-          <span class="dot" :class="syncDotClass" />
-          <h3>最近同步状态</h3>
-        </header>
-        <p class="primary-value">{{ syncStatusText }}</p>
-        <p class="secondary">{{ syncSummaryText }}</p>
-      </article>
-    </section>
-
-    <section class="panel">
-      <header class="panel-header">
-        <h2>Milvus 同步操作</h2>
-        <a-space>
-          <a-switch v-model:checked="recreateCollection">
-            <template #checkedChildren>重建集合</template>
-            <template #unCheckedChildren>增量覆盖</template>
-          </a-switch>
-          <a-button type="primary" :loading="syncLoading" @click="handleSyncMilvus">
-            触发知识库同步
+          <a-button type="primary" :loading="queryLoading || healthLoading" @click="refreshAll">
+            <template #icon><ReloadOutlined /></template>
+            刷新状态
           </a-button>
         </a-space>
-      </header>
+      </template>
+    </a-page-header>
 
-      <div class="sync-meta" v-if="lastSyncResult">
-        <a-descriptions :column="2" bordered size="small">
-          <a-descriptions-item label="status">
-            {{ String(lastSyncResult.status ?? '--') }}
-          </a-descriptions-item>
-          <a-descriptions-item label="collection">
-            {{ String(lastSyncResult.collection ?? '--') }}
-          </a-descriptions-item>
-          <a-descriptions-item label="preparedDocs">
-            {{ String(lastSyncResult.preparedDocs ?? '--') }}
-          </a-descriptions-item>
-          <a-descriptions-item label="upsertedDocs">
-            {{ String(lastSyncResult.upsertedDocs ?? '--') }}
-          </a-descriptions-item>
-          <a-descriptions-item label="failedBatches">
-            {{ String(lastSyncResult.failedBatches ?? '--') }}
-          </a-descriptions-item>
-          <a-descriptions-item label="loaded">
-            {{ String(lastSyncResult.loaded ?? '--') }}
-          </a-descriptions-item>
-        </a-descriptions>
-      </div>
-    </section>
+    <div class="monitor-content">
+      <!-- Status Cards Row -->
+      <a-row :gutter="[16, 16]" class="status-cards">
+        <a-col :xs="24" :lg="8">
+          <a-card :bordered="false" class="statistic-card">
+            <a-statistic :value="healthStatus" title="服务健康状态">
+              <template #prefix>
+                <HeartOutlined :style="{ color: healthDotColor }" />
+              </template>
+            </a-statistic>
+            <div class="card-footer">
+              <span class="secondary-text">{{ healthText }}</span>
+              <a-tag :color="healthDotColor">{{ healthStatus === 'UP' ? '正常' : (healthStatus === '--' ? '未加载' : '异常') }}</a-tag>
+            </div>
+          </a-card>
+        </a-col>
 
-    <section class="panel">
-      <header class="panel-header">
-        <h2>Milvus 计数详情</h2>
-      </header>
-      <a-descriptions :column="2" bordered size="small" v-if="queryResult">
-        <a-descriptions-item label="queryCount">
-          {{ String(queryResult.queryCount ?? '--') }}
-        </a-descriptions-item>
-        <a-descriptions-item label="statsRowCount">
-          {{ String(queryResult.statsRowCount ?? '--') }}
-        </a-descriptions-item>
-        <a-descriptions-item label="truncated">
-          {{ String(queryResult.truncated ?? '--') }}
-        </a-descriptions-item>
-        <a-descriptions-item label="limit">
-          {{ String(queryResult.limit ?? '--') }}
-        </a-descriptions-item>
-        <a-descriptions-item label="collection">
-          {{ String(queryResult.collection ?? '--') }}
-        </a-descriptions-item>
-        <a-descriptions-item label="primaryField">
-          {{ String(queryResult.primaryField ?? '--') }}
-        </a-descriptions-item>
-      </a-descriptions>
+        <a-col :xs="24" :lg="8">
+          <a-card :bordered="false" class="statistic-card">
+            <a-statistic :value="queryCountDisplay" title="Milvus 可查询条数">
+              <template #prefix>
+                <DatabaseOutlined :style="{ color: queryDotColor }" />
+              </template>
+              <template #suffix>条</template>
+            </a-statistic>
+            <div class="card-footer">
+              <span class="secondary-text">统计方式：{{ countByDisplay }}</span>
+            </div>
+          </a-card>
+        </a-col>
 
-      <div v-if="sampleIds.length > 0" class="sample-box">
-        <h4>sampleIds</h4>
-        <div class="sample-list">
-          <span v-for="item in sampleIds" :key="item">{{ item }}</span>
-        </div>
-      </div>
-    </section>
+        <a-col :xs="24" :lg="8">
+          <a-card :bordered="false" class="statistic-card">
+            <a-statistic :value="syncStatusText" title="最近同步状态">
+              <template #prefix>
+                <SyncOutlined :style="{ color: syncDotColor }" :spin="syncLoading" />
+              </template>
+            </a-statistic>
+            <div class="card-footer">
+              <span class="secondary-text">{{ syncSummaryText }}</span>
+            </div>
+          </a-card>
+        </a-col>
+      </a-row>
+
+      <!-- Detail Panels -->
+      <a-row :gutter="[16, 16]" class="detail-panels" type="flex">
+        <!-- 同步操作面板 -->
+        <a-col :xs="24" :xl="12" style="display: flex; flex-direction: column;">
+          <a-card title="知识库同步" :bordered="false" class="panel-card" style="flex: 1;">
+            <template #extra>
+              <a-space>
+                <a-switch v-model:checked="recreateCollection" checked-children="重建" un-checked-children="增量" />
+                <a-button type="primary" :loading="syncLoading" @click="handleSyncMilvus">
+                  <template #icon><CloudUploadOutlined /></template>
+                  触发同步
+                </a-button>
+              </a-space>
+            </template>
+            
+            <a-empty v-if="!lastSyncResult" description="暂无同步记录，请触发同步查看状态" />
+            <a-descriptions v-else bordered size="middle" :column="1">
+              <a-descriptions-item label="Status">
+                <a-tag :color="lastSyncResult.status === 'success' ? 'success' : (lastSyncResult.status === 'partial' ? 'warning' : 'error')">
+                  {{ lastSyncResult.status ?? '--' }}
+                </a-tag>
+              </a-descriptions-item>
+              <a-descriptions-item label="Collection">
+                {{ lastSyncResult.collection ?? '--' }}
+              </a-descriptions-item>
+              <a-descriptions-item label="Prepared Docs">
+                {{ lastSyncResult.preparedDocs ?? '0' }}
+              </a-descriptions-item>
+              <a-descriptions-item label="Upserted Docs">
+                <span style="color: #52c41a; font-weight: bold;">{{ lastSyncResult.upsertedDocs ?? '0' }}</span>
+              </a-descriptions-item>
+              <a-descriptions-item label="Failed Batches">
+                <span :style="{ color: Number(lastSyncResult.failedBatches) > 0 ? '#f5222d' : 'inherit' }">
+                  {{ lastSyncResult.failedBatches ?? '0' }}
+                </span>
+              </a-descriptions-item>
+              <a-descriptions-item label="Loaded">
+                <a-tag :color="lastSyncResult.loaded ? 'processing' : 'default'">{{ lastSyncResult.loaded ? 'Yes' : 'No' }}</a-tag>
+              </a-descriptions-item>
+            </a-descriptions>
+          </a-card>
+        </a-col>
+
+        <!-- 计数详情面板 -->
+        <a-col :xs="24" :xl="12" style="display: flex; flex-direction: column;">
+          <a-card title="查询监控详情" :bordered="false" class="panel-card" style="flex: 1;">
+            <a-empty v-if="!queryResult" description="暂无查询数据，请刷新获取" />
+            <div v-else>
+              <a-descriptions bordered size="middle" :column="{ xs: 1, sm: 2 }">
+                <a-descriptions-item label="Query Count">
+                  <span style="color: #1890ff; font-weight: bold; font-size: 16px;">{{ queryResult.queryCount ?? '--' }}</span>
+                </a-descriptions-item>
+                <a-descriptions-item label="Stats Row Count">
+                  {{ queryResult.statsRowCount ?? '--' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="Truncated" :span="2">
+                  <a-tag :color="queryResult.truncated ? 'warning' : 'blue'">
+                    {{ queryResult.truncated ? 'Yes (Reach Limit)' : 'No (Full Details)' }}
+                  </a-tag>
+                </a-descriptions-item>
+                <a-descriptions-item label="Limit" :span="1">
+                  {{ queryResult.limit ?? '--' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="Collection" :span="1">
+                  {{ queryResult.collection ?? '--' }}
+                </a-descriptions-item>
+                <a-descriptions-item label="Primary Field" :span="2">
+                  {{ queryResult.primaryField ?? '--' }}
+                </a-descriptions-item>
+              </a-descriptions>
+              
+              <div v-if="sampleIds.length > 0" class="sample-box">
+                <div class="sample-title">
+                  <DatabaseOutlined /> Sample IDs (Top 50)
+                </div>
+                <div class="sample-list">
+                  <a-tag color="cyan" v-for="item in sampleIds.slice(0, 50)" :key="item">{{ item }}</a-tag>
+                  <a-tag v-if="sampleIds.length > 50">...and {{ sampleIds.length - 50 }} more</a-tag>
+                </div>
+              </div>
+            </div>
+          </a-card>
+        </a-col>
+      </a-row>
+    </div>
   </div>
 </template>
 
@@ -126,6 +159,16 @@
 import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { health, queryMilvusCount, syncMilvusKnowledge } from '@/api/monitoringController'
+import {
+  ReloadOutlined,
+  HeartOutlined,
+  DatabaseOutlined,
+  SyncOutlined,
+  CloudUploadOutlined
+} from '@ant-design/icons-vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const queryLimit = ref(200)
 const recreateCollection = ref(false)
@@ -181,50 +224,34 @@ const syncStatusText = computed(() => {
 
 const syncSummaryText = computed(() => {
   if (!lastSyncResult.value) {
-    return '尚未触发同步任务'
+    return '尚未触发同步任务，暂无汇总信息'
   }
   const upserted = String(lastSyncResult.value.upsertedDocs ?? '--')
   const failedBatches = String(lastSyncResult.value.failedBatches ?? '--')
-  return `upserted=${upserted}, failedBatches=${failedBatches}`
+  return `Upserted: ${upserted} 篇，Failed: ${failedBatches} 批次`
 })
 
-const healthDotClass = computed(() => {
+const healthDotColor = computed(() => {
   const value = healthStatus.value.toLowerCase()
-  if (value === 'up') {
-    return 'ok'
-  }
-  if (value === '--') {
-    return 'idle'
-  }
-  return 'error'
+  if (value === 'up') return '#52c41a'
+  if (value === '--') return '#bfbfbf'
+  return '#f5222d'
 })
 
-const queryDotClass = computed(() => {
-  if (!queryResult.value) {
-    return 'idle'
-  }
+const queryDotColor = computed(() => {
+  if (!queryResult.value) return '#bfbfbf'
   const status = String(queryResult.value.status ?? '').toLowerCase()
-  if (status === 'success') {
-    return 'ok'
-  }
-  if (status === 'failed') {
-    return 'error'
-  }
-  return 'idle'
+  if (status === 'success') return '#1890ff'
+  if (status === 'failed') return '#f5222d'
+  return '#bfbfbf'
 })
 
-const syncDotClass = computed(() => {
-  if (!lastSyncResult.value) {
-    return 'idle'
-  }
+const syncDotColor = computed(() => {
+  if (!lastSyncResult.value) return '#bfbfbf'
   const status = String(lastSyncResult.value.status ?? '').toLowerCase()
-  if (status === 'success' || status === 'partial') {
-    return 'ok'
-  }
-  if (status === 'failed') {
-    return 'error'
-  }
-  return 'idle'
+  if (status === 'success' || status === 'partial') return '#52c41a'
+  if (status === 'failed') return '#f5222d'
+  return '#bfbfbf'
 })
 
 const sampleIds = computed(() => {
@@ -267,6 +294,11 @@ async function refreshQueryCount() {
   }
 }
 
+async function refreshAll() {
+  await Promise.all([refreshHealth(), refreshQueryCount()]);
+  message.success('状态已刷新');
+}
+
 async function handleSyncMilvus() {
   syncLoading.value = true
   try {
@@ -291,175 +323,112 @@ async function handleSyncMilvus() {
 }
 
 onMounted(async () => {
-  await refreshHealth()
-  await refreshQueryCount()
+  await Promise.all([refreshHealth(), refreshQueryCount()])
 })
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .ai-admin-monitor-page {
-  display: grid;
-  gap: 18px;
+  /* Give enough space and look crisp */
 }
 
-.monitor-hero {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 16px;
-  padding: 22px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #163056 0%, #2f6fda 55%, #56a8ff 100%);
-  color: #ffffff;
-
-  .eyebrow {
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    opacity: 0.9;
-  }
-
-  h1 {
-    margin-top: 4px;
-    font-size: 28px;
-    line-height: 1.2;
-  }
-
-  .subtitle {
-    margin-top: 8px;
-    opacity: 0.92;
-  }
-
-  .hero-actions {
-    :deep(.ant-input-number) {
-      min-width: 150px;
-    }
-  }
+.monitor-content {
+  padding: 0 24px 24px;
 }
 
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+.status-cards {
+  margin-bottom: 24px;
 }
 
-.status-card {
-  background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 28, 46, 0.08);
-  padding: 16px;
-
-  header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  h3 {
-    font-size: 15px;
-    color: #223046;
-  }
-
-  .primary-value {
-    margin-top: 10px;
-    font-size: 26px;
-    font-weight: 700;
-    color: #0f1c2e;
-  }
-
-  .secondary {
-    margin-top: 6px;
-    color: #5b6475;
-    font-size: 13px;
-  }
+.statistic-card {
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
 }
 
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-
-  &.idle {
-    background: #9aa6b2;
-  }
-
-  &.ok {
-    background: #1ea672;
-    box-shadow: 0 0 0 6px rgba(30, 166, 114, 0.16);
-  }
-
-  &.error {
-    background: #d64545;
-    box-shadow: 0 0 0 6px rgba(214, 69, 69, 0.16);
-  }
+.statistic-card:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
-.panel {
-  background: #ffffff;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 28, 46, 0.08);
-  padding: 16px;
+.statistic-card :deep(.ant-card-body) {
+  padding: 24px 24px 20px 24px;
 }
 
-.panel-header {
+.statistic-card :deep(.ant-statistic-title) {
+  font-size: 15px;
+  color: #5c6b77;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.statistic-card :deep(.ant-statistic-content) {
+  font-size: 28px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.card-footer {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #f0f2f5;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-
-  h2 {
-    font-size: 17px;
-    color: #0f1c2e;
-  }
 }
 
-.sync-meta {
-  margin-top: 10px;
+.card-footer .secondary-text {
+  color: #8492a6;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+}
+
+.detail-panels {
+  /* flex to align children heights if possible */
+  align-items: stretch;
+}
+
+.panel-card {
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.panel-card :deep(.ant-card-head-title) {
+  font-weight: 600;
+  font-size: 16px;
 }
 
 .sample-box {
-  margin-top: 14px;
-  padding: 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 28, 46, 0.08);
-  background: #f8fbff;
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
 
-  h4 {
-    color: #223046;
-    margin-bottom: 8px;
-  }
+.sample-title {
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .sample-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-
-  span {
-    padding: 4px 8px;
-    border-radius: 999px;
-    font-size: 12px;
-    color: #1f3476;
-    background: #eaf1ff;
-    border: 1px solid #adc4ff;
-  }
 }
 
-@media (max-width: 1080px) {
-  .monitor-hero {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .status-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .panel-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
+:deep(.ant-page-header) {
+  padding-left: 24px;
+  padding-right: 24px;
+  background-color: transparent;
 }
 </style>
