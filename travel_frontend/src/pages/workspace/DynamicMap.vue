@@ -28,6 +28,7 @@ let markerList: any[] = []
 let polylineLayers: any[] = [] // 改为数组，存储多条路线
 let renderVersion = 0
 const positionCache = new Map<string, [number, number] | null>()
+const MAX_GEOCODE_CONCURRENCY = 4
 
 // 定义一组高级感的颜色，用于区分不同天数的路线和标记
 const DAY_COLORS = ['#1360ff', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
@@ -156,7 +157,43 @@ function parseRawCoordinate(activity: any): [number, number] | null {
     lat = temp
   }
 
+  if (Math.abs(lon) > 180 || Math.abs(lat) > 90) {
+    return null
+  }
+
   return [lon, lat]
+}
+
+function periodRank(rawPeriod: unknown): number {
+  const value = String(rawPeriod || '').toLowerCase().trim()
+  if (value.includes('morning') || value.includes('早') || value.includes('上午')) return 1
+  if (value.includes('noon') || value.includes('afternoon') || value.includes('中') || value.includes('午')) return 2
+  if (value.includes('evening') || value.includes('night') || value.includes('晚')) return 3
+  return 4
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) {
+    return []
+  }
+
+  const safeConcurrency = Math.max(1, Math.min(concurrency, items.length))
+  const results = new Array<R>(items.length)
+  let nextIndex = 0
+
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const current = nextIndex++
+      results[current] = await worker(items[current], current)
+    }
+  }
+
+  await Promise.all(Array.from({ length: safeConcurrency }, () => runWorker()))
+  return results
 }
 
 function buildQueryCandidates(itinerary: StructuredItinerary, activity: any): string[] {
@@ -164,15 +201,27 @@ function buildQueryCandidates(itinerary: StructuredItinerary, activity: any): st
   const address = (activity?.location?.address || '').trim()
   const name = (activity?.name || '').trim()
   const candidates = [
-    address,
-    [destination, address].filter(Boolean).join(' '),
-    [address, name].filter(Boolean).join(' '),
     [destination, name].filter(Boolean).join(' '),
+    [destination, address].filter(Boolean).join(' '),
+    address,
+    [address, name].filter(Boolean).join(' '),
     name,
-    destination,
   ]
 
   return Array.from(new Set(candidates.filter((item) => item.length > 0)))
+}
+
+function buildPoiCandidates(itinerary: StructuredItinerary, activity: any): string[] {
+  const destination = (itinerary.destination || '').trim()
+  const name = (activity?.name || '').trim()
+  const address = (activity?.location?.address || '').trim()
+  const keywords = [
+    [destination, name].filter(Boolean).join(' '),
+    name,
+    [destination, address].filter(Boolean).join(' '),
+    address,
+  ]
+  return Array.from(new Set(keywords.filter((item) => item.length > 0)))
 }
 
 function geocodeByAddress(query: string): Promise<[number, number] | null> {
@@ -231,9 +280,20 @@ async function resolveActivityPosition(itinerary: StructuredItinerary, activity:
     return positionCache.get(cacheKey) || null
   }
 
+  const city = (itinerary.destination || '').trim()
+  const poiKeywords = buildPoiCandidates(itinerary, activity)
   const candidates = buildQueryCandidates(itinerary, activity)
 
-  // 1) 先按“地点/地址”做地理编码（主策略）
+  // 1) 先用地点名 / POI 检索，尽量拿到高德原生点位
+  for (const keyword of poiKeywords) {
+    const poiPoint = await searchByPoi(keyword, city)
+    if (poiPoint) {
+      positionCache.set(cacheKey, poiPoint)
+      return poiPoint
+    }
+  }
+
+  // 2) 再做地理编码兜底
   for (const query of candidates) {
     const point = await geocodeByAddress(query)
     if (point) {
@@ -242,29 +302,20 @@ async function resolveActivityPosition(itinerary: StructuredItinerary, activity:
     }
   }
 
-  // 2) 地址失败后尝试 POI 检索（仍以地点名称为主）
-  const city = (itinerary.destination || '').trim()
-  const poiKeywords = [
-    (activity?.location?.address || '').trim(),
-    (activity?.name || '').trim(),
-    [city, (activity?.name || '').trim()].filter(Boolean).join(' '),
-  ].filter((v) => v.length > 0)
-
-  for (const keyword of Array.from(new Set(poiKeywords))) {
-    const poiPoint = await searchByPoi(keyword, city)
-    if (poiPoint) {
-      positionCache.set(cacheKey, poiPoint)
-      return poiPoint
-    }
-  }
-
-  // 3) 最终兜底才使用经纬度（辅助策略）
+  // 3) 最后再使用经纬度兜底
   const rawCoordinate = parseRawCoordinate(activity)
   if (rawCoordinate) {
     const [gcjLon, gcjLat] = wgs84togcj02(rawCoordinate[0], rawCoordinate[1])
     const point: [number, number] = [gcjLon, gcjLat]
     positionCache.set(cacheKey, point)
     return point
+  }
+
+  // 4) 终极兜底到目的地中心点，避免地图完全无点位
+  const destinationCenter = await resolveDestinationCenter(itinerary.destination || '')
+  if (destinationCenter) {
+    positionCache.set(cacheKey, destinationCenter)
+    return destinationCenter
   }
 
   positionCache.set(cacheKey, null)
@@ -302,53 +353,71 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
   const currentRender = ++renderVersion
   clearMap()
   showNoDataHint.value = false
-  positionCache.clear()
 
   if (!itinerary || !itinerary.dailyPlans) return
 
   const dayCoordsMap: Record<number, [number, number][]> = {}
   const nextMarkerList: any[] = []
+  const overlapCounter = new Map<string, number>()
   let dayIndex = 0
   let totalPointsCount = 0
 
   for (const plan of itinerary.dailyPlans) {
     dayIndex++
-    const currentDay = dayIndex
-    if (!plan.activities) continue
+    const parsedDay = Number(plan.day)
+    const currentDay = Number.isFinite(parsedDay) && parsedDay > 0 ? parsedDay : dayIndex
+    const planActivities = Array.isArray(plan.activities) ? plan.activities : []
+    if (planActivities.length === 0) continue
 
-    for (const activity of plan.activities) {
-      const point = await resolveActivityPosition(itinerary, activity)
+    const orderedActivities = planActivities
+      .map((activity, index) => ({ activity, index, rank: periodRank(activity?.time) }))
+      .sort((a, b) => a.rank - b.rank || a.index - b.index)
 
-      if (currentRender !== renderVersion) {
-        return
-      }
+    const resolvedActivities = await mapWithConcurrency(
+      orderedActivities,
+      MAX_GEOCODE_CONCURRENCY,
+      async ({ activity }) => ({
+        activity,
+        point: await resolveActivityPosition(itinerary, activity),
+      }),
+    )
 
-      if (!point) {
+    if (currentRender !== renderVersion) {
+      return
+    }
+
+    for (const resolved of resolvedActivities) {
+      if (!resolved.point) {
         continue
       }
 
-      const [lng, lat] = point
+      const activity = resolved.activity
+      const [lng, lat] = resolved.point
+      const overlapKey = `${lng.toFixed(6)},${lat.toFixed(6)}`
+      const overlapCount = overlapCounter.get(overlapKey) || 0
+      overlapCounter.set(overlapKey, overlapCount + 1)
+      const displayLng = overlapCount === 0 ? lng : lng + overlapCount * 0.00018
+      const displayLat = overlapCount === 0 ? lat : lat + overlapCount * 0.00012
+
       if (!dayCoordsMap[currentDay]) {
         dayCoordsMap[currentDay] = []
       }
-      dayCoordsMap[currentDay].push([lng, lat])
+      dayCoordsMap[currentDay].push([displayLng, displayLat])
       totalPointsCount++
 
       const dayColor = DAY_COLORS[(currentDay - 1) % DAY_COLORS.length]
 
-      const customHtml = `
-        <div class="custom-poi-marker">
-          <div class="poi-pulse" style="background: ${dayColor}66; animation-duration: ${1.5 + Math.random()}s;"></div>
-          <div class="poi-dot" style="background: ${dayColor}; box-shadow: 0 4px 10px ${dayColor}66;">D${currentDay}</div>
-        </div>
-      `
-
       const marker = new AMapObj.Marker({
-        position: [lng, lat],
-        content: customHtml,
-        offset: new AMapObj.Pixel(-14, -14),
+        position: [displayLng, displayLat],
         title: `Day ${currentDay} - ${activity.name || '景点'}`,
       })
+      if (typeof marker.setLabel === 'function') {
+        marker.setLabel({
+          direction: 'top',
+          offset: new AMapObj.Pixel(0, -8),
+          content: `<span style="display:inline-block;background:${dayColor};color:#fff;padding:2px 6px;border-radius:999px;font-size:11px;font-weight:600;">D${currentDay}</span>`,
+        })
+      }
 
       marker.on('click', () => {
         const infoWindow = new AMapObj.InfoWindow({
@@ -404,6 +473,30 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
         polylineLayers.push(polyline)
       }
     })
+
+    // 如果每天都只有一个点，回退为“全程连线”，避免用户看不到任何路线
+    if (polylineLayers.length === 0 && totalPointsCount > 1) {
+      const allPoints = Object.keys(dayCoordsMap)
+        .map((key) => Number(key))
+        .sort((a, b) => a - b)
+        .flatMap((day) => dayCoordsMap[day] || [])
+      if (allPoints.length > 1) {
+        const fallbackPolyline = new AMapObj.Polyline({
+          path: allPoints,
+          isOutline: true,
+          outlineColor: '#ffffff',
+          borderWeight: 2,
+          strokeColor: '#1360ff',
+          strokeOpacity: 0.85,
+          strokeWeight: 5,
+          showDir: true,
+          lineJoin: 'round',
+          lineCap: 'round',
+          strokeStyle: 'dashed',
+        })
+        polylineLayers.push(fallbackPolyline)
+      }
+    }
 
     if (polylineLayers.length > 0) {
       mapInstance.value.add(polylineLayers)
@@ -486,7 +579,7 @@ function wgs84togcj02(lon: number, lat: number) {
 .dynamic-map-container {
   width: 100%;
   height: 100%;
-  min-height: 420px;
+  min-height: 0;
   flex: 1;
   border-radius: 8px;
   overflow: hidden;

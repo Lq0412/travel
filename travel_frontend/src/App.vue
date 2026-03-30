@@ -49,6 +49,11 @@ body {
   overflow-x: hidden;
 }
 
+body.workspace-no-scroll {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 /* ?????????????? + ????? */
 /* Unified coastal-blue palette */
 :root {

@@ -1,5 +1,5 @@
 <template>
-  <div class="top-layout">
+  <div class="top-layout" :class="{ 'is-workspace-route': isWorkspaceRoute }">
     <header class="top-header" :class="{ scrolled: isScrolled }">
       <div class="top-inner">
         <router-link to="/" class="brand">
@@ -92,13 +92,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { userLogout } from '@/api/userController'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 
 const router = useRouter()
+const route = useRoute()
 const loginUserStore = useLoginUserStore()
 
 const navItems = computed(() => {
@@ -118,6 +119,7 @@ const isScrolled = ref(false)
 const isMobile = ref(false)
 const showMobileMenu = ref(false)
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
+const isWorkspaceRoute = computed(() => route.path === '/workspace')
 
 function syncViewport() {
   isMobile.value = window.innerWidth < 1100
@@ -128,6 +130,10 @@ function syncViewport() {
 
 function handleScroll() {
   isScrolled.value = window.scrollY > 6
+}
+
+function syncWorkspaceNoScroll(active: boolean) {
+  document.body.classList.toggle('workspace-no-scroll', active)
 }
 
 function goLogin() {
@@ -168,13 +174,19 @@ onMounted(() => {
   loginUserStore.fetchLoginUser()
   syncViewport()
   handleScroll()
+  syncWorkspaceNoScroll(isWorkspaceRoute.value)
   window.addEventListener('resize', syncViewport)
   window.addEventListener('scroll', handleScroll)
+})
+
+watch(isWorkspaceRoute, (active) => {
+  syncWorkspaceNoScroll(active)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', syncViewport)
   window.removeEventListener('scroll', handleScroll)
+  syncWorkspaceNoScroll(false)
 })
 </script>
 
@@ -186,6 +198,12 @@ onUnmounted(() => {
   background:
     radial-gradient(circle at top left, rgba(59, 110, 220, 0.08), transparent 25%),
     linear-gradient(180deg, #f7faff 0%, #f4f7fb 220px, #f4f7fb 100%);
+}
+
+.top-layout.is-workspace-route {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
 }
 
 .top-header {
@@ -323,6 +341,12 @@ onUnmounted(() => {
   padding: 14px 20px 28px;
 }
 
+.top-layout.is-workspace-route .main-shell {
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 14px;
+}
+
 .main-inner {
   max-width: 1320px;
   margin: 0 auto;
@@ -330,6 +354,11 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+.top-layout.is-workspace-route .main-inner {
+  min-height: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 1100px) {
