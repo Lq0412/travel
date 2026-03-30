@@ -12,21 +12,24 @@
         >
           保存行程
         </a-button>
+        <a-button v-if="isLoggedIn" type="default" @click="toggleMapVisible">
+          {{ mapVisible ? '隐藏地图' : '显示地图' }}
+        </a-button>
         <a-button v-if="isLoggedIn" type="link" @click="goTrips">我的行程</a-button>
         <a-button v-else type="primary" @click="goLogin">登录</a-button>
       </div>
     </header>
 
     <section v-if="isLoggedIn" class="planner-stage">
-      <div class="stage-content">
-        <div class="timeline-panel">
+      <div class="stage-content" :class="{ 'map-hidden': !mapVisible }">
+        <div class="timeline-panel" :class="{ 'timeline-panel-full': !mapVisible }">
           <ItineraryTimelineBoard
             :itinerary="currentItinerary"
             :meta="responseMeta"
             :diff="itineraryDiff"
           />
         </div>
-        <div class="map-panel">
+        <div v-if="mapVisible" class="map-panel">
           <DynamicMap :itinerary="currentItinerary" />
         </div>
       </div>
@@ -94,6 +97,7 @@ import { useChatStream } from '@/composables/useChatStream'
 import { saveTrip } from '@/api/tripController'
 
 type DayPeriod = 'morning' | 'noon' | 'evening'
+type ActivityType = 'attraction' | 'transport' | 'rest' | 'meal'
 
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
@@ -108,12 +112,14 @@ const lastItinerarySignature = ref('')
 const itineraryDiff = ref<ItineraryDiffSummary | null>(null)
 const itineraryDiffRound = ref(0)
 const imageQueryCache = new Map<string, string>()
+const mapVisible = ref(true)
 const baseSuggestions = [
   '给我一版 3 天游轻松路线，早中晚各 1 个景点',
   '把第二天晚上改成夜景和夜市路线',
   '整体预算控制到 2000 元以内',
   '每一天午间安排室内景点，避开暴晒',
 ]
+const ALLOWED_ACTIVITY_TYPES = new Set<ActivityType>(['attraction', 'transport', 'rest', 'meal'])
 
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
 const { isLoading, startStream, closeStream, structuredData, responseMeta } = useChatStream()
@@ -187,6 +193,10 @@ function goTrips() {
   router.push('/trips')
 }
 
+function toggleMapVisible() {
+  mapVisible.value = !mapVisible.value
+}
+
 function resetConversation() {
   enrichmentVersion.value += 1
   lastItinerarySignature.value = ''
@@ -249,6 +259,20 @@ function normalizePeriod(raw: string): DayPeriod {
   }
 
   return 'morning'
+}
+
+function normalizeActivityType(raw: string): ActivityType {
+  const value = (raw || '').trim().toLowerCase() as ActivityType
+  if (ALLOWED_ACTIVITY_TYPES.has(value)) {
+    return value
+  }
+  return 'attraction'
+}
+
+function periodWeight(period: DayPeriod): number {
+  if (period === 'morning') return 1
+  if (period === 'noon') return 2
+  return 3
 }
 
 function ensureArray<T>(value: unknown): T[] {
@@ -363,11 +387,12 @@ function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItin
   const sourcePlans = ensureArray<DailyPlan>(cloned.dailyPlans)
 
   cloned.dailyPlans = sourcePlans.map((plan, index) => {
+    type ActivityWithSourceIndex = Activity & { __sourceIndex: number }
     const rawPlan = plan as { activities?: unknown }
     const sourceActivities = ensureArray<Activity>(rawPlan.activities)
 
     plan.day = index + 1
-    plan.activities = sourceActivities.map((activity) => {
+    const normalizedActivities: ActivityWithSourceIndex[] = sourceActivities.map((activity, activityIndex) => {
       const raw = activity as unknown as {
         imageUrl?: string
         image?: string
@@ -425,17 +450,31 @@ function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItin
         normalizedLocation.coordinates = [lonNum, latNum]
       }
 
+      const period = normalizePeriod(activity.time)
       return {
         ...activity,
-        time: normalizePeriod(activity.time),
+        __sourceIndex: activityIndex,
+        time: period,
         name: activity.name || '',
         description: activity.description || '',
-        type: activity.type || 'attraction',
+        type: normalizeActivityType(activity.type),
         imageUrl: isUsableImageUrl(candidateImage) ? candidateImage : '',
         location: normalizedLocation,
         estimatedCost: Number(activity.estimatedCost || 0),
       }
     })
+    plan.activities = normalizedActivities
+      .sort((a, b) => {
+        const periodDiff = periodWeight(a.time as DayPeriod) - periodWeight(b.time as DayPeriod)
+        if (periodDiff !== 0) {
+          return periodDiff
+        }
+        return a.__sourceIndex - b.__sourceIndex
+      })
+      .map(({ __sourceIndex, ...activity }) => {
+        void __sourceIndex
+        return activity
+      })
     return plan
   })
 
@@ -630,8 +669,9 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
   margin: 0 auto;
-  padding: 0 16px 12px;
+  padding: 0 16px 8px;
   box-sizing: border-box;
 }
 
@@ -639,7 +679,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 10px 0 12px;
+  padding: 8px 0 8px;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
@@ -649,26 +689,43 @@ onUnmounted(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .stage-content {
   flex: 1;
   display: flex;
-  min-height: 420px;
-  gap: 16px;
-  padding: 12px 0;
+  min-height: 0;
+  overflow: hidden;
+  gap: 12px;
+  align-items: stretch;
 }
 
 .timeline-panel {
-  flex: 1.5; /* 时间轴占更大比例 */
+  flex: 2.2; /* 时间轴占更大比例 */
   min-width: 0;
+  min-height: 0;
   display: flex;
+  height: 100%;
+  overflow: hidden;
 }
 
 .map-panel {
-  flex: 1;
+  flex: 0.9;
   min-width: 0;
   display: flex;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.stage-content.map-hidden {
+  gap: 0;
+}
+
+.timeline-panel-full {
+  flex: 1 1 100%;
+  width: 100%;
 }
 
 .timeline-panel :deep(.timeline-board) {
@@ -678,10 +735,10 @@ onUnmounted(() => {
 }
 
 .bottom-chat {
-  position: sticky;
-  bottom: 0;
+  position: relative;
   z-index: 8;
-  padding: 8px 0 10px;
+  flex-shrink: 0;
+  padding: 6px 0 6px;
   border-top: 1px solid rgba(15, 28, 46, 0.08);
   background: linear-gradient(180deg, rgba(244, 247, 251, 0.3), rgba(244, 247, 251, 0.98));
   backdrop-filter: blur(8px);
@@ -689,7 +746,7 @@ onUnmounted(() => {
 
 .theme-selector-container {
   display: flex;
-  margin: 0 auto 12px;
+  margin: 0 auto 8px;
   max-width: 960px;
   align-items: center;
 }
@@ -705,7 +762,7 @@ onUnmounted(() => {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin: 0 auto 8px;
+  margin: 0 auto 6px;
   max-width: 960px;
 }
 
@@ -744,12 +801,32 @@ onUnmounted(() => {
 
 @media (max-width: 960px) {
   .stage-content {
-    flex-direction: column;
-    min-height: 320px;
+    flex-direction: row;
+    min-height: 0;
   }
+
+  .timeline-panel {
+    flex: 1.8;
+  }
+
   .map-panel {
-    display: flex;
-    min-height: 280px;
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .stage-content {
+    flex-direction: column;
+  }
+
+  .timeline-panel {
+    flex: 1;
+  }
+
+  .map-panel {
+    flex: 0 0 180px;
+    min-height: 180px;
   }
 }
 

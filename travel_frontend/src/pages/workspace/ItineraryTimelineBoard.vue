@@ -1,25 +1,32 @@
 <template>
   <div class="timeline-board">
-    <!-- 固定在屏幕上的主轴线，像齿轮轨道一样 -->
-    <div v-if="timelineNodes.length" class="main-axis fixed-track"></div>
+    <!-- 移除了外层的 main-axis fixed-track -->
 
-    <div v-if="timelineNodes.length && summaryMeta" class="explain-strip">
-      <span class="explain-pill">{{ summaryMeta.intentLabel }}</span>
-      <span class="explain-pill">结构化来源：{{ summaryMeta.sourceLabel }}</span>
-      <span class="explain-pill">活动数：{{ summaryMeta.activityCount }}</span>
-      <span v-if="summaryMeta.totalEstimatedCost" class="explain-pill">
-        预算约 ¥{{ summaryMeta.totalEstimatedCost }}
-      </span>
-      <template v-if="diffMeta">
-        <span class="explain-pill explain-pill-strong">第 {{ diffMeta.round }} 轮更新</span>
-        <span class="explain-pill">+{{ diffMeta.addedCount }} / -{{ diffMeta.removedCount }} / ~{{ diffMeta.updatedCount }}</span>
-        <span v-if="diffMeta.changedDaysLabel" class="explain-pill">涉及：{{ diffMeta.changedDaysLabel }}</span>
-      </template>
+    <div v-if="timelineNodes.length && summaryMeta" class="meta-dropdown" @click.stop>
+      <button type="button" class="meta-trigger" @click="toggleMetaDropdown">
+        行程识别信息
+      </button>
+      <div v-show="metaDropdownOpen" class="meta-panel">
+        <div class="meta-row">{{ summaryMeta.intentLabel }}</div>
+        <div class="meta-row">结构化来源：{{ summaryMeta.sourceLabel }}</div>
+        <div class="meta-row">活动数：{{ summaryMeta.activityCount }}</div>
+        <div v-if="summaryMeta.totalEstimatedCost" class="meta-row">
+          预算约 ¥{{ summaryMeta.totalEstimatedCost }}
+        </div>
+        <template v-if="diffMeta">
+          <div class="meta-row meta-row-strong">第 {{ diffMeta.round }} 轮更新</div>
+          <div class="meta-row">+{{ diffMeta.addedCount }} / -{{ diffMeta.removedCount }} / ~{{ diffMeta.updatedCount }}</div>
+          <div v-if="diffMeta.changedDaysLabel" class="meta-row">涉及：{{ diffMeta.changedDaysLabel }}</div>
+        </template>
+      </div>
     </div>
 
-    <div v-if="timelineNodes.length" class="timeline-wrapper" @wheel.prevent="onWheel">
-      <div class="timeline-scroll-area">
-        <div class="timeline-items">
+    <div v-if="timelineNodes.length" class="timeline-shell">
+      <div class="main-axis fixed-track"></div>
+
+      <div class="timeline-wrapper" @wheel.prevent="onWheel">
+        <div class="timeline-scroll-area">
+          <div class="timeline-items">
           <template v-for="(spot, index) in timelineNodes" :key="spot.nodeKey">
             
             <!-- 天数分隔标记，直接坐在主轴上 -->
@@ -66,8 +73,9 @@
 
           </template>
 
-          <!-- 用这个空白块来把容器右侧物理撑开，真正起到延伸数轴的作用 -->
-          <div class="timeline-end-spacer"></div>
+          <!-- 末尾留小缓冲，避免最后卡片贴边 -->
+            <div class="timeline-end-spacer"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -110,6 +118,7 @@ const props = defineProps<{
 }>()
 
 const failedImages = ref<Set<string>>(new Set())
+const metaDropdownOpen = ref(false)
 
 function ensureArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : []
@@ -250,13 +259,17 @@ function onWheel(e: WheelEvent) {
     el.scrollLeft += e.deltaY
   }
 }
+
+function toggleMetaDropdown() {
+  metaDropdownOpen.value = !metaDropdownOpen.value
+}
 </script>
 
 <style scoped>
 .timeline-board {
   width: 100%;
   height: 100%;
-  min-height: 540px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background-color: transparent;
@@ -265,37 +278,68 @@ function onWheel(e: WheelEvent) {
   overflow: hidden; /* 保证两侧内容滑出范围时被安全裁切，不再越界 */
 }
 
-.explain-strip {
+.meta-dropdown {
   position: absolute;
-  top: 14px;
-  left: 14px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  top: 8px;
+  right: 8px;
   z-index: 12;
 }
 
-.explain-pill {
-  background: rgba(15, 23, 42, 0.72);
-  color: #f8fafc;
+.meta-trigger {
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  background: rgba(255, 255, 255, 0.94);
+  color: #0f172a;
   border-radius: 999px;
+  padding: 5px 11px;
   font-size: 12px;
-  line-height: 1;
-  padding: 7px 10px;
-  backdrop-filter: blur(6px);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
 }
 
-.explain-pill-strong {
-  background: rgba(28, 91, 224, 0.84);
+.meta-panel {
+  margin-top: 6px;
+  min-width: 220px;
+  max-width: 300px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  padding: 8px;
+}
+
+.meta-row {
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.4;
+  padding: 2px 4px;
+}
+
+.meta-row-strong {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.timeline-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  margin-top: 0;
+  overflow: hidden;
 }
 
 .timeline-wrapper {
   flex: 1;
-  height: 100%;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow-x: auto;
   overflow-y: hidden;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   position: relative;
   z-index: 2;
   /* 隐藏滚动条，增强无边界感 */
@@ -312,15 +356,18 @@ function onWheel(e: WheelEvent) {
   position: relative;
   display: flex;
   align-items: center;
-  width: max-content; /* 关键：允许无限自适应撑开宽度 */
+  width: max-content;
   min-width: 100%;
   height: 560px;
+  box-sizing: border-box;
   padding-left: 80px; /* 只保留左侧缩进 */
+  padding-right: 80px;
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
-/* 用一个极宽的实际 DOM 节点去撑开 flex 容器，使得后面永远有空余去产生滑动的旷野感 */
 .timeline-end-spacer {
-  width: 120px; /* 限制最后可以滑出的宽度，不能无限滑了 */
+  width: 48px;
   flex-shrink: 0;
   height: 1px;
 }
@@ -330,11 +377,12 @@ function onWheel(e: WheelEvent) {
   position: absolute;
   top: 50%;
   left: 0;
-  width: 100%;
+  right: 0;
   height: 2px; /* 极简的细线 */
   background-color: #cbd5e1; /* 淡雅的灰线 */
   transform: translateY(-50%);
-  z-index: 1; /* 在 wrapper 的底层 */
+  z-index: 1;
+  pointer-events: none;
 }
 
 /* 极简右侧箭头 */
@@ -386,8 +434,8 @@ function onWheel(e: WheelEvent) {
 /* 节点容器分配固定水平宽度 */
 .timeline-item {
   position: relative;
-  width: 250px; 
-  margin: 0 20px;
+  width: 200px; 
+  margin: 0 10px;
   height: 2px;
   display: flex;
   justify-content: center;
@@ -420,7 +468,7 @@ function onWheel(e: WheelEvent) {
   position: absolute;
   left: 50%;
   width: 3px;
-  height: 50px;
+  height: 18px;
   background-color: #94a3b8;    /* 深色一点 */
   transform: translateX(-50%);
   z-index: 2;
@@ -428,7 +476,7 @@ function onWheel(e: WheelEvent) {
 
 /* 详情卡片 */
 .spot-card {
-  width: 260px;
+  width: 220px;
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
@@ -453,8 +501,8 @@ function onWheel(e: WheelEvent) {
 .is-top .connector { bottom: 0; }
 .is-bottom .connector { top: 0; }
 
-.is-top .spot-card { bottom: 60px; }
-.is-bottom .spot-card { top: 60px; }
+.is-top .spot-card { bottom: 24px; }
+.is-bottom .spot-card { top: 24px; }
 .is-bottom .spot-card:hover {
   transform: translateX(-50%) translateY(4px) scale(1.02);
 }
@@ -462,7 +510,7 @@ function onWheel(e: WheelEvent) {
 /* 卡片图片区 */
 .card-image {
   width: 100%;
-  height: 120px;
+  height: 104px;
   background: #f8fafc;
   overflow: hidden;
 }
@@ -475,7 +523,7 @@ function onWheel(e: WheelEvent) {
 
 .card-image-placeholder {
   width: 100%;
-  height: 120px;
+  height: 104px;
   background: linear-gradient(135deg, #e0e7ff 0%, #bfdbfe 100%);
   display: flex;
   align-items: center;
@@ -491,7 +539,7 @@ function onWheel(e: WheelEvent) {
 
 /* 卡片文本区 */
 .card-body {
-  padding: 16px;
+  padding: 12px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -501,7 +549,7 @@ function onWheel(e: WheelEvent) {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .period-badge {
@@ -517,7 +565,7 @@ function onWheel(e: WheelEvent) {
 
 .spot-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: #0f172a;
   white-space: nowrap;
@@ -539,16 +587,17 @@ function onWheel(e: WheelEvent) {
   margin: 0;
   font-size: 13px;
   color: #475569;
-  line-height: 1.5;
+  line-height: 1.45;
+  line-clamp: 2;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 .spot-meta {
-  margin-top: 10px;
-  padding-top: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
@@ -589,5 +638,36 @@ function onWheel(e: WheelEvent) {
 
 .empty-state p {
   font-size: 15px;
+}
+
+@media (max-width: 960px) {
+  .timeline-board {
+    min-height: 0;
+  }
+
+  .meta-trigger {
+    font-size: 11px;
+    padding: 4px 9px;
+  }
+
+  .meta-panel {
+    min-width: 200px;
+    max-width: 220px;
+  }
+
+  .timeline-scroll-area {
+    height: 520px;
+    padding-left: 56px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .is-top .spot-card {
+    bottom: 26px;
+  }
+
+  .is-bottom .spot-card {
+    top: 26px;
+  }
 }
 </style>
