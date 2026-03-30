@@ -2,7 +2,7 @@
   <div class="dynamic-map-shell">
     <div class="dynamic-map-container" ref="mapContainer"></div>
     <div v-if="showNoDataHint" class="map-empty-hint">
-      当前行程没有可用坐标，地图先展示底图。继续发送一次行程请求后会自动打点。
+      当前行程没有可定位的地址信息，地图先展示底图。可在对话中补充更具体的地点名称或地址。
     </div>
   </div>
 </template>
@@ -22,12 +22,15 @@ const showNoDataHint = ref(false)
 // 为了避免高德地图实例被 Proxy 代理导致性能或渲染极其卡顿，必须用 shallowRef
 const mapInstance = shallowRef<any>(null)
 let AMapObj: any = null
+const geocoder = shallowRef<any>(null)
+const placeSearch = shallowRef<any>(null)
 let markerList: any[] = []
 let polylineLayer: any = null
+let renderVersion = 0
 
 onMounted(async () => {
   if (!mapContainer.value) return
-  
+
   // 设置安全密钥，需在加载前设置
   ;(window as any)._AMapSecurityConfig = {
     securityJsCode: import.meta.env.VITE_AMAP_SECURITY_CODE || '这里填你的安全密钥',
@@ -37,7 +40,7 @@ onMounted(async () => {
     AMapObj = await AMapLoader.load({
       key: import.meta.env.VITE_AMAP_KEY || '这里填你的API-KEY', // 申请好的Web端开发者Key
       version: '2.0', // 指定要加载的 JSAPI 的版本
-      plugins: ['AMap.Marker', 'AMap.Polyline', 'AMap.InfoWindow'], // 需要使用的的插件列表
+      plugins: ['AMap.Marker', 'AMap.Polyline', 'AMap.InfoWindow', 'AMap.Geocoder', 'AMap.PlaceSearch'],
     })
 
     mapInstance.value = new AMapObj.Map(mapContainer.value, {
@@ -45,8 +48,18 @@ onMounted(async () => {
       zoom: 4, // 初始地图级别
     })
 
+    geocoder.value = new AMapObj.Geocoder({
+      city: '全国',
+    })
+
+    placeSearch.value = new AMapObj.PlaceSearch({
+      city: '全国',
+      citylimit: false,
+      pageSize: 1,
+    })
+
     if (props.itinerary) {
-      drawItinerary(props.itinerary)
+      await drawItinerary(props.itinerary)
     }
   } catch (e) {
     console.error('高德地图加载失败', e)
@@ -58,15 +71,21 @@ onUnmounted(() => {
     mapInstance.value.destroy()
     mapInstance.value = null
   }
+  geocoder.value = null
+  placeSearch.value = null
 })
 
-watch(() => props.itinerary, (newItinerary) => {
+watch(() => props.itinerary, async (newItinerary) => {
   if (mapInstance.value && AMapObj) {
-    drawItinerary(newItinerary)
+    await drawItinerary(newItinerary)
   }
 }, { deep: true })
 
 function clearMap() {
+  if (!mapInstance.value) {
+    return
+  }
+
   if (markerList.length > 0) {
     mapInstance.value.remove(markerList)
     markerList = []
@@ -77,73 +96,213 @@ function clearMap() {
   }
 }
 
-function drawItinerary(itinerary: StructuredItinerary | null) {
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+function extractLngLat(location: any): [number, number] | null {
+  if (!location) {
+    return null
+  }
+
+  if (Array.isArray(location) && location.length >= 2) {
+    const lng = toNumber(location[0])
+    const lat = toNumber(location[1])
+    if (lng !== null && lat !== null) {
+      return [lng, lat]
+    }
+  }
+
+  const lng = toNumber(location.lng) ?? (typeof location.getLng === 'function' ? toNumber(location.getLng()) : null)
+  const lat = toNumber(location.lat) ?? (typeof location.getLat === 'function' ? toNumber(location.getLat()) : null)
+
+  if (lng !== null && lat !== null) {
+    return [lng, lat]
+  }
+
+  return null
+}
+
+function parseRawCoordinate(activity: any): [number, number] | null {
+  const rawLon = activity?.location?.longitude ?? activity?.longitude ?? activity?.['location.longitude'] ?? activity?.lng
+  const rawLat = activity?.location?.latitude ?? activity?.latitude ?? activity?.['location.latitude'] ?? activity?.lat
+
+  let lon = toNumber(rawLon)
+  let lat = toNumber(rawLat)
+
+  if (lon === null || lat === null) {
+    return null
+  }
+
+  // 容错：如果模型把经纬度写反，则自动交换
+  if (Math.abs(lat) > 90 && Math.abs(lon) <= 90) {
+    const temp = lon
+    lon = lat
+    lat = temp
+  }
+
+  return [lon, lat]
+}
+
+function buildQueryCandidates(itinerary: StructuredItinerary, activity: any): string[] {
+  const destination = (itinerary.destination || '').trim()
+  const address = (activity?.location?.address || '').trim()
+  const name = (activity?.name || '').trim()
+  const candidates = [
+    [destination, address].filter(Boolean).join(' '),
+    address,
+    [destination, name].filter(Boolean).join(' '),
+    name,
+  ]
+
+  return Array.from(new Set(candidates.filter((item) => item.length > 0)))
+}
+
+function geocodeByAddress(query: string): Promise<[number, number] | null> {
+  return new Promise((resolve) => {
+    const instance = geocoder.value
+    if (!instance || !query.trim()) {
+      resolve(null)
+      return
+    }
+
+    instance.getLocation(query, (status: string, result: any) => {
+      if (status !== 'complete') {
+        resolve(null)
+        return
+      }
+
+      const geocode = result?.geocodes?.[0]
+      resolve(extractLngLat(geocode?.location))
+    })
+  })
+}
+
+function searchByPoi(keyword: string, city: string): Promise<[number, number] | null> {
+  return new Promise((resolve) => {
+    const instance = placeSearch.value
+    if (!instance || !keyword.trim()) {
+      resolve(null)
+      return
+    }
+
+    if (typeof instance.setCity === 'function' && city) {
+      instance.setCity(city)
+    }
+
+    instance.search(keyword, (status: string, result: any) => {
+      if (status !== 'complete') {
+        resolve(null)
+        return
+      }
+
+      const poi = result?.poiList?.pois?.[0]
+      resolve(extractLngLat(poi?.location))
+    })
+  })
+}
+
+async function resolveActivityPosition(itinerary: StructuredItinerary, activity: any): Promise<[number, number] | null> {
+  const candidates = buildQueryCandidates(itinerary, activity)
+
+  for (const query of candidates) {
+    const point = await geocodeByAddress(query)
+    if (point) {
+      return point
+    }
+  }
+
+  const keyword = (activity?.name || activity?.location?.address || '').trim()
+  const poiPoint = await searchByPoi(keyword, (itinerary.destination || '').trim())
+  if (poiPoint) {
+    return poiPoint
+  }
+
+  // 最终兜底：若模型确实给了坐标，仍可显示，避免整日程无点位
+  const rawCoordinate = parseRawCoordinate(activity)
+  if (rawCoordinate) {
+    const [gcjLon, gcjLat] = wgs84togcj02(rawCoordinate[0], rawCoordinate[1])
+    return [gcjLon, gcjLat]
+  }
+
+  return null
+}
+
+async function drawItinerary(itinerary: StructuredItinerary | null) {
+  const currentRender = ++renderVersion
   clearMap()
   showNoDataHint.value = false
 
   if (!itinerary || !itinerary.dailyPlans) return
 
   const coords: [number, number][] = []
-  let dayIndex = 0;
+  const nextMarkerList: any[] = []
+  let dayIndex = 0
 
   for (const plan of itinerary.dailyPlans) {
     dayIndex++
+    const currentDay = dayIndex
     if (!plan.activities) continue
 
     for (const activity of plan.activities) {
-      const rawLon = activity.location?.longitude
-      const rawLat = activity.location?.latitude
+      const point = await resolveActivityPosition(itinerary, activity)
 
-      let lon = typeof rawLon === 'string' ? parseFloat(rawLon) : rawLon
-      let lat = typeof rawLat === 'string' ? parseFloat(rawLat) : rawLat
-
-      if (Number.isFinite(lon) && Number.isFinite(lat)) {
-        // Fallback constraint in case the AI swaps lon/lat
-        if (Math.abs(lat as number) > 90 && Math.abs(lon as number) <= 90) {
-          const temp = lon
-          lon = lat
-          lat = temp
-        }
-
-        // 高德原生要求使用 GCJ-02，理论上如果是 WGS-84 可以调用 AMap.convertFrom() 进行转换。
-        // 为了稳定、离线的高效转化，我们仍保留之前的转火星坐标公式：
-        const [gcjLon, gcjLat] = wgs84togcj02(lon as number, lat as number)
-        coords.push([gcjLon, gcjLat])
-
-        const customHtml = `
-          <div class="custom-poi-marker">
-            <div class="poi-pulse"></div>
-            <div class="poi-dot">D${dayIndex}</div>
-          </div>
-        `
-
-        const marker = new AMapObj.Marker({
-          position: [gcjLon, gcjLat],
-          content: customHtml,
-          offset: new AMapObj.Pixel(-14, -14),
-          title: `Day ${dayIndex} - ${activity.name || '景点'}`
-        })
-
-        // 添加点击信息窗
-        marker.on('click', () => {
-          const infoWindow = new AMapObj.InfoWindow({
-            content: `
-              <div style="padding: 10px; max-width: 250px;">
-                <div style="font-weight:bold; margin-bottom:4px;">Day ${dayIndex} - ${activity.name || '景点'}</div>
-                <div style="font-size:12px; color:#666;">${activity.location?.address || ''}</div>
-              </div>
-            `,
-            offset: new AMapObj.Pixel(0, -20)
-          })
-          infoWindow.open(mapInstance.value, marker.getPosition())
-        })
-
-        markerList.push(marker)
+      if (currentRender !== renderVersion) {
+        return
       }
+
+      if (!point) {
+        continue
+      }
+
+      const [lng, lat] = point
+      coords.push([lng, lat])
+
+      const customHtml = `
+        <div class="custom-poi-marker">
+          <div class="poi-pulse"></div>
+          <div class="poi-dot">D${currentDay}</div>
+        </div>
+      `
+
+      const marker = new AMapObj.Marker({
+        position: [lng, lat],
+        content: customHtml,
+        offset: new AMapObj.Pixel(-14, -14),
+        title: `Day ${currentDay} - ${activity.name || '景点'}`,
+      })
+
+      marker.on('click', () => {
+        const infoWindow = new AMapObj.InfoWindow({
+          content: `
+            <div style="padding: 10px; max-width: 250px;">
+              <div style="font-weight:bold; margin-bottom:4px;">Day ${currentDay} - ${activity.name || '景点'}</div>
+              <div style="font-size:12px; color:#666;">${activity.location?.address || ''}</div>
+            </div>
+          `,
+          offset: new AMapObj.Pixel(0, -20),
+        })
+        infoWindow.open(mapInstance.value, marker.getPosition())
+      })
+
+      nextMarkerList.push(marker)
     }
   }
 
+  if (currentRender !== renderVersion) {
+    return
+  }
+
   if (coords.length > 0) {
+    markerList = nextMarkerList
+
     if (markerList.length > 0) {
       mapInstance.value.add(markerList)
     }
@@ -165,7 +324,8 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
     mapInstance.value.add(polylineLayer)
 
     // 视口自适应
-    mapInstance.value.setFitView(undefined, false, [40, 40, 40, 40])
+    const overlays = [...markerList, polylineLayer]
+    mapInstance.value.setFitView(overlays, false, [40, 40, 40, 40])
   } else {
     showNoDataHint.value = true
   }
@@ -288,13 +448,5 @@ function wgs84togcj02(lon: number, lat: number) {
 @keyframes poi-pulse {
   0% { transform: scale(0.6); opacity: 1; }
   100% { transform: scale(1.6); opacity: 0; }
-}
-
-/* 隐藏高德 logo 和 调整 copyright (可选) */
-:deep(.amap-logo) {
-  display: none !important;
-}
-:deep(.amap-copyright) {
-  opacity: 0.5;
 }
 </style>

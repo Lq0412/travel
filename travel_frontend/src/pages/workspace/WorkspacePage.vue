@@ -425,7 +425,7 @@ function buildPlannerPrompt(userInput: string): string {
     themeInstruction = '【偏好要求：大学生特种兵打卡游】必须是高性价比、高密度的行程。包含网红打卡点、高性价比夜市和小吃街，不强制高品质酒店，主打一个高效低预算游玩。'
   }
 
-  const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。dailyPlans.activities 中每个景点必须包含：time（morning/noon/evening）、name、description、type、location（必须是包含 address、longitude标准WGS84小数经度、latitude标准WGS84小数纬度 这三个字段的嵌套对象）、estimatedCost、imageUrl。'
+  const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。dailyPlans.activities 中每个景点必须包含：time（morning/noon/evening）、name、description、type、location（必须包含 address，地址要尽量具体到景区/街道/商圈；longitude、latitude 为可选字段，如提供请使用标准WGS84小数经纬度）、estimatedCost、imageUrl。'
 
   return `${userInput}\n\n${themeInstruction ? themeInstruction + '\n\n' : ''}${baseConstraint}`
 }
