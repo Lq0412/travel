@@ -101,12 +101,18 @@ import { useLoginUserStore } from '@/stores/useLoginUserStore'
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
 
-const navItems = [
-  { label: '首页', path: '/' },
-  { label: '规划行程', path: '/workspace' },
-  { label: '我的行程', path: '/trips' },
-  { label: '我的', path: '/profile' },
-]
+const navItems = computed(() => {
+  const items = [
+    { label: '首页', path: '/' },
+    { label: '规划行程', path: '/workspace' },
+    { label: '我的行程', path: '/trips' },
+    { label: '我的', path: '/profile' },
+  ]
+  if (loginUserStore.loginUser.userRole === 'admin') {
+    items.push({ label: 'AI监控', path: '/admin/ai-monitor' })
+  }
+  return items
+})
 
 const isScrolled = ref(false)
 const isMobile = ref(false)

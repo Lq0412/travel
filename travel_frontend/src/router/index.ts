@@ -3,6 +3,7 @@ import HomePage from '@/pages/HomePage.vue'
 import WorkspacePage from '@/pages/workspace/WorkspacePage.vue'
 import TripsPage from '@/pages/trips/TripsPage.vue'
 import TripDetailPage from '@/pages/trips/TripDetailPage.vue'
+import AIAdminMonitorPage from '@/pages/ai/AIAdminMonitorPage.vue'
 import ProfilePage from '@/pages/user/ProfilePage.vue'
 import UserLoginPage from '@/pages/user/UserLoginPage.vue'
 import UserRegisterPage from '@/pages/user/UserRegisterPage.vue'
@@ -38,6 +39,12 @@ const router = createRouter({
       path: '/profile',
       name: '我的',
       component: ProfilePage,
+      meta: { layout: 'topnav' },
+    },
+    {
+      path: '/admin/ai-monitor',
+      name: 'AI监控',
+      component: AIAdminMonitorPage,
       meta: { layout: 'topnav' },
     },
     {

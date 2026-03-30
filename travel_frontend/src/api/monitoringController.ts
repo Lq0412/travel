@@ -56,6 +56,38 @@ export async function getQuota(options?: { [key: string]: any }) {
   })
 }
 
+/** 此处后端没有提供注释 GET /ai/monitor/rag/milvus/query-count */
+export async function queryMilvusCount(
+  params?: {
+    limit?: number
+  },
+  options?: { [key: string]: any }
+) {
+  return request<API.ResponseDTOMapStringObject>('/ai/monitor/rag/milvus/query-count', {
+    method: 'GET',
+    params: {
+      ...(params || {}),
+    },
+    ...(options || {}),
+  })
+}
+
+/** 此处后端没有提供注释 POST /ai/monitor/rag/milvus/sync */
+export async function syncMilvusKnowledge(
+  params?: {
+    recreateCollection?: boolean
+  },
+  options?: { [key: string]: any }
+) {
+  return request<API.ResponseDTOMapStringObject>('/ai/monitor/rag/milvus/sync', {
+    method: 'POST',
+    params: {
+      ...(params || {}),
+    },
+    ...(options || {}),
+  })
+}
+
 /** 此处后端没有提供注释 POST /ai/monitor/quota/recharge */
 export async function rechargeQuota(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
