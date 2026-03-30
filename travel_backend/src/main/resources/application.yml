@@ -33,6 +33,26 @@ digital-human:
   python-service-url: http://localhost:8888  # Python数字人服务地址
 
 ai:
+  rag:
+    enabled: true
+    top-k: 6
+    snippet-max-length: 280
+    milvus:
+      enabled: false
+      endpoint: ${MILVUS_ENDPOINT:http://127.0.0.1:19530}
+      token: ${MILVUS_TOKEN:}
+      database: ${MILVUS_DATABASE:default}
+      collection: ${MILVUS_COLLECTION:travel_knowledge}
+      vector-field: ${MILVUS_VECTOR_FIELD:embedding}
+      primary-field: ${MILVUS_PRIMARY_FIELD:id}
+      search-timeout-ms: 8000
+      nprobe: 16
+      auto-init-collection: true
+      auto-sync-on-startup: false
+      sync-batch-size: 20
+      sync-limit-per-table: 300
+      startup-init-retry-times: 6
+      startup-init-retry-interval-ms: 3000
   cache:
     caffeine:
       max-size: 10000  # Caffeine缓存最大条目数

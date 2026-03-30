@@ -25,8 +25,11 @@ let AMapObj: any = null
 const geocoder = shallowRef<any>(null)
 const placeSearch = shallowRef<any>(null)
 let markerList: any[] = []
-let polylineLayer: any = null
+let polylineLayers: any[] = [] // 改为数组，存储多条路线
 let renderVersion = 0
+
+// 定义一组高级感的颜色，用于区分不同天数的路线和标记
+const DAY_COLORS = ['#1360ff', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
 
 onMounted(async () => {
   if (!mapContainer.value) return
@@ -46,6 +49,10 @@ onMounted(async () => {
     mapInstance.value = new AMapObj.Map(mapContainer.value, {
       center: [104.195397, 35.86166], // 中国中心点坐标
       zoom: 4, // 初始地图级别
+      viewMode: '3D', // 开启3D视图
+      pitch: 45, // 俯仰角，增加科技感
+      rotation: 15,
+      mapStyle: 'amap://styles/normal' // 或换成更炫酷的底图 amap://styles/macaron
     })
 
     geocoder.value = new AMapObj.Geocoder({
@@ -90,9 +97,9 @@ function clearMap() {
     mapInstance.value.remove(markerList)
     markerList = []
   }
-  if (polylineLayer) {
-    mapInstance.value.remove(polylineLayer)
-    polylineLayer = null
+  if (polylineLayers.length > 0) {
+    mapInstance.value.remove(polylineLayers)
+    polylineLayers = []
   }
 }
 
@@ -242,9 +249,10 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
 
   if (!itinerary || !itinerary.dailyPlans) return
 
-  const coords: [number, number][] = []
+  const dayCoordsMap: Record<number, [number, number][]> = {}
   const nextMarkerList: any[] = []
   let dayIndex = 0
+  let totalPointsCount = 0
 
   for (const plan of itinerary.dailyPlans) {
     dayIndex++
@@ -263,12 +271,18 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
       }
 
       const [lng, lat] = point
-      coords.push([lng, lat])
+      if (!dayCoordsMap[currentDay]) {
+        dayCoordsMap[currentDay] = []
+      }
+      dayCoordsMap[currentDay].push([lng, lat])
+      totalPointsCount++
+
+      const dayColor = DAY_COLORS[(currentDay - 1) % DAY_COLORS.length]
 
       const customHtml = `
         <div class="custom-poi-marker">
-          <div class="poi-pulse"></div>
-          <div class="poi-dot">D${currentDay}</div>
+          <div class="poi-pulse" style="background: ${dayColor}66; animation-duration: ${1.5 + Math.random()}s;"></div>
+          <div class="poi-dot" style="background: ${dayColor}; box-shadow: 0 4px 10px ${dayColor}66;">D${currentDay}</div>
         </div>
       `
 
@@ -283,7 +297,7 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
         const infoWindow = new AMapObj.InfoWindow({
           content: `
             <div style="padding: 10px; max-width: 250px;">
-              <div style="font-weight:bold; margin-bottom:4px;">Day ${currentDay} - ${activity.name || '景点'}</div>
+              <div style="font-weight:bold; margin-bottom:4px; color:${dayColor};">Day ${currentDay} - ${activity.name || '景点'}</div>
               <div style="font-size:12px; color:#666;">${activity.location?.address || ''}</div>
             </div>
           `,
@@ -300,32 +314,47 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
     return
   }
 
-  if (coords.length > 0) {
+  if (totalPointsCount > 0) {
     markerList = nextMarkerList
 
     if (markerList.length > 0) {
       mapInstance.value.add(markerList)
     }
 
-    // 绘制虚线轨迹
-    polylineLayer = new AMapObj.Polyline({
-      path: coords,
-      isOutline: true,
-      outlineColor: '#fff',
-      borderWeight: 2,
-      strokeColor: '#1360ff',
-      strokeOpacity: 0.85,
-      strokeWeight: 4,
-      strokeStyle: 'dashed',
-      strokeDasharray: [10, 5],
-      lineJoin: 'round',
-      lineCap: 'round',
+    polylineLayers = []
+
+    // 按天绘制并带有方向提示的连线
+    Object.keys(dayCoordsMap).forEach(dayKey => {
+      const dIndex = parseInt(dayKey)
+      const dayPts = dayCoordsMap[dIndex]
+      const color = DAY_COLORS[(dIndex - 1) % DAY_COLORS.length]
+
+      // 仅当该天有超过1个点时才连线
+      if (dayPts.length > 1) {
+        const polyline = new AMapObj.Polyline({
+          path: dayPts,
+          isOutline: true,
+          outlineColor: '#ffffff',
+          borderWeight: 2,
+          strokeColor: color,
+          strokeOpacity: 0.9,
+          strokeWeight: 6,
+          // 开启方向箭头，让路线有流动感
+          showDir: true,
+          lineJoin: 'round',
+          lineCap: 'round',
+        })
+        polylineLayers.push(polyline)
+      }
     })
-    mapInstance.value.add(polylineLayer)
+
+    if (polylineLayers.length > 0) {
+      mapInstance.value.add(polylineLayers)
+    }
 
     // 视口自适应
-    const overlays = [...markerList, polylineLayer]
-    mapInstance.value.setFitView(overlays, false, [40, 40, 40, 40])
+    const overlays = [...markerList, ...polylineLayers]
+    mapInstance.value.setFitView(overlays, false, [60, 60, 60, 60])
   } else {
     showNoDataHint.value = true
   }
@@ -419,10 +448,8 @@ function wgs84togcj02(lon: number, lat: number) {
 :deep(.custom-poi-marker .poi-dot) {
   width: 28px;
   height: 28px;
-  background: #1360ff;
   border: 2px solid #fff;
   border-radius: 50%;
-  box-shadow: 0 4px 10px rgba(19, 96, 255, 0.4);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -431,6 +458,10 @@ function wgs84togcj02(lon: number, lat: number) {
   justify-content: center;
   position: relative;
   z-index: 2;
+  transition: transform 0.2s ease;
+}
+:deep(.custom-poi-marker:hover .poi-dot) {
+  transform: scale(1.15);
 }
 
 :deep(.custom-poi-marker .poi-pulse) {
@@ -439,9 +470,8 @@ function wgs84togcj02(lon: number, lat: number) {
   left: -6px;
   width: 40px;
   height: 40px;
-  background: rgba(19, 96, 255, 0.4);
   border-radius: 50%;
-  animation: poi-pulse 2s ease-out infinite;
+  animation: poi-pulse 1.5s ease-out infinite;
   z-index: 1;
 }
 

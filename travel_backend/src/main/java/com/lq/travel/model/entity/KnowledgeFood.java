@@ -11,7 +11,7 @@ import java.util.List;
  * 美食知识库实体
  */
 @Data
-@TableName("tb_knowledge_food")
+@TableName("knowledge_food")
 public class KnowledgeFood implements Serializable {
 
     /**

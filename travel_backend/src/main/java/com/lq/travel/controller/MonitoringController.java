@@ -1,6 +1,8 @@
 package com.lq.travel.controller;
 
 import com.lq.travel.service.AIUserContextService;
+import com.lq.travel.service.impl.MilvusKnowledgeSyncService;
+import com.lq.travel.service.impl.MilvusRagClient;
 import com.lq.travel.service.QuotaService;
 import com.lq.travel.util.AICacheHandler;
 import com.lq.travel.annotation.AuthCheck;
@@ -38,6 +40,12 @@ public class MonitoringController {
 
     @Resource
     private AIUserContextService aiUserContextService;
+
+    @Resource
+    private MilvusKnowledgeSyncService milvusKnowledgeSyncService;
+
+    @Resource
+    private MilvusRagClient milvusRagClient;
 
     /**
      * 健康检查端点
@@ -170,5 +178,29 @@ public class MonitoringController {
         log.info("管理员为用户 {} 充值 {} tokens", userId, tokens);
 
         return ResponseEntity.ok(ResponseDTO.success("充值成功", null));
+    }
+
+    /**
+     * 管理员：触发 Milvus 知识库全量同步
+     */
+    @PostMapping("/rag/milvus/sync")
+    @AuthCheck(mustRole = "admin")
+    public ResponseEntity<ResponseDTO<Map<String, Object>>> syncMilvusKnowledge(
+            @RequestParam(defaultValue = "false") boolean recreateCollection) {
+
+        Map<String, Object> result = milvusKnowledgeSyncService.syncKnowledgeToMilvus(recreateCollection);
+        return ResponseEntity.ok(ResponseDTO.success("Milvus知识库同步执行完成", result));
+    }
+
+    /**
+     * 管理员：检查 Milvus 当前可查询条数（兼容 entities/count 不可用场景）
+     */
+    @GetMapping("/rag/milvus/query-count")
+    @AuthCheck(mustRole = "admin")
+    public ResponseEntity<ResponseDTO<Map<String, Object>>> queryMilvusCount(
+            @RequestParam(defaultValue = "200") int limit) {
+
+        Map<String, Object> result = milvusRagClient.queryEntityCount(limit);
+        return ResponseEntity.ok(ResponseDTO.success("Milvus可查询条数检查完成", result));
     }
 }

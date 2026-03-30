@@ -9,6 +9,8 @@ import com.lq.travel.model.dto.ai.AgentRequest;
 import com.lq.travel.model.dto.ai.AgentResponse;
 import com.lq.travel.model.enums.IntentType;
 import com.lq.travel.service.AIService;
+import com.lq.travel.service.TravelRagService;
+import com.lq.travel.service.impl.TravelMultiAgentCoordinator;
 import com.lq.travel.util.IntentAnalyzer;
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,9 +24,16 @@ import java.util.List;
 public class GenericTravelAgent extends BaseAgent {
 
     private static final String ERROR_ACTION = "error";
+    private final TravelRagService travelRagService;
+    private final TravelMultiAgentCoordinator multiAgentCoordinator;
 
-    public GenericTravelAgent(String name, AIService aiService) {
+    public GenericTravelAgent(String name,
+                              AIService aiService,
+                              TravelRagService travelRagService,
+                              TravelMultiAgentCoordinator multiAgentCoordinator) {
         super(name, "通用旅行智能助手 - 提供多目的地旅行规划和咨询", aiService);
+        this.travelRagService = travelRagService;
+        this.multiAgentCoordinator = multiAgentCoordinator;
     }
 
     @Override
@@ -46,7 +55,9 @@ public class GenericTravelAgent extends BaseAgent {
             log.info("通用旅行代理意图识别: {} - {}", intent, intent.getDescription());
 
             String systemPrompt = getSystemPromptByIntent(intent);
-            String enhancedPrompt = buildEnhancedPrompt(request, intent);
+            String destinationHint = multiAgentCoordinator.inferDestinationHint(request);
+            String ragContext = travelRagService.buildRagContext(request.getTask(), destinationHint, intent);
+            String enhancedPrompt = multiAgentCoordinator.buildCoordinatedPrompt(request, intent, ragContext, destinationHint);
 
             AIRequest aiRequest = AIRequest.builder()
                     .message(enhancedPrompt)
@@ -72,8 +83,16 @@ public class GenericTravelAgent extends BaseAgent {
     @Override
     protected AgentResponse.Step executeStep(int stepNumber, AgentRequest request, List<AgentResponse.Step> previousSteps) {
         try {
+            String destinationHint = multiAgentCoordinator.inferDestinationHint(request);
+            String ragContext = travelRagService.buildRagContext(request.getTask(), destinationHint, IntentType.GENERAL_CHAT);
+
             AIRequest aiRequest = AIRequest.builder()
-                    .message(buildEnhancedPrompt(request, IntentType.GENERAL_CHAT))
+                .message(multiAgentCoordinator.buildCoordinatedPrompt(
+                    request,
+                    IntentType.GENERAL_CHAT,
+                    ragContext,
+                    destinationHint
+                ))
                     .systemPrompt(getSystemPrompt())
                     .temperature(0.6)
                     .maxTokens(1200)
@@ -186,32 +205,5 @@ public class GenericTravelAgent extends BaseAgent {
                 """;
             case GENERAL_CHAT -> getSystemPrompt();
         };
-    }
-
-    private String buildEnhancedPrompt(AgentRequest request, IntentType intent) {
-        StringBuilder prompt = new StringBuilder();
-
-        if (request.getContext() != null && !request.getContext().isEmpty()) {
-            prompt.append("【上下文信息】\n").append(request.getContext()).append("\n\n");
-        }
-
-        prompt.append("【用户需求】\n").append(request.getTask()).append("\n\n");
-
-        if (intent == IntentType.ITINERARY_GENERATION) {
-            prompt.append("【规划要求】\n");
-            prompt.append("请为用户生成详细旅行行程，包括：\n");
-            prompt.append("1. 每日按 morning/noon/evening 三个时段安排\n");
-            prompt.append("2. 景点、餐饮、住宿推荐\n");
-            prompt.append("3. 预算估算（门票、餐饮、住宿）\n");
-            prompt.append("4. 实用旅游建议和注意事项\n");
-            prompt.append("5. 结构化的JSON数据（必须包含）\n");
-            prompt.append("6. JSON字段必须与前端结构保持一致，便于直接渲染和保存\n\n");
-        }
-
-        if (request.getConstraints() != null && !request.getConstraints().isEmpty()) {
-            prompt.append("【约束条件】\n").append(request.getConstraints()).append("\n");
-        }
-
-        return prompt.toString();
     }
 }

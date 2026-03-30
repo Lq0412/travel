@@ -196,6 +196,13 @@
             <version>${spring-ai.version}</version>
         </dependency>
 
+        <!-- Milvus Java SDK：向量检索与RAG能力 -->
+        <dependency>
+            <groupId>io.milvus</groupId>
+            <artifactId>milvus-sdk-java</artifactId>
+            <version>2.6.16</version>
+        </dependency>
+
         <!-- 阿里云 DashScope/通义 API 客户端，排除多余日志与 HTTP 依赖 -->
         <dependency>
             <groupId>com.alibaba</groupId>
@@ -217,11 +224,10 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- Bean Validation 规范接口 -->
+        <!-- Bean Validation：提供校验实现（Hibernate Validator） -->
         <dependency>
-            <groupId>jakarta.validation</groupId>
-            <artifactId>jakarta.validation-api</artifactId>
-            <version>3.0.2</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
         <!-- Jackson 对 Java 时间类型 (JSR310) 的序列化支持 -->
         <dependency>
@@ -277,5 +283,3 @@
     </build>
 
 </project>
-
-

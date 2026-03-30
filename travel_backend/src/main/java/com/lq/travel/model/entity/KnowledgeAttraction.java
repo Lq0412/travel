@@ -11,7 +11,7 @@ import java.util.List;
  * 景点知识库实体
  */
 @Data
-@TableName("tb_knowledge_attraction")
+@TableName("knowledge_attraction")
 public class KnowledgeAttraction implements Serializable {
 
     /**

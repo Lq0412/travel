@@ -145,6 +145,10 @@ mvn spring-boot:run
 - **AI 对话**
   - `POST /api/ai/chat`：流式对话接口，支持通义千问大模型。
 
+- **AI 监控与 Milvus 运维（管理员）**
+  - `POST /api/ai/monitor/rag/milvus/sync`：触发 Milvus 全量知识同步，可选重建集合。
+  - `GET  /api/ai/monitor/rag/milvus/query-count`：基于 `entities/query` 返回当前可查询条数（兼容 `entities/count` 不可用场景）。
+
 - **AI 行程规划**
   - `POST /api/ai/trips/generate`：根据目的地 / 天数 / 预算 / 主题生成行程方案。
   - `POST /api/ai/trips/save`：保存行程与 `structured_data`。
