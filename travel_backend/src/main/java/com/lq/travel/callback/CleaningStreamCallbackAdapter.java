@@ -25,7 +25,7 @@ import java.util.regex.Matcher;
  *   <li>需要纯净文本的场景</li>
  * </ul>
  */
-public class CleaningStreamCallbackAdapter implements StreamCallback {
+public class    CleaningStreamCallbackAdapter implements StreamCallback {
     
     /** 委托的回调对象 */
     private final StreamCallback delegate;

@@ -8,21 +8,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, onUnmounted } from 'vue'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import { ref, onMounted, watch, onUnmounted, shallowRef } from 'vue'
+import AMapLoader from '@amap/amap-jsapi-loader'
 import type { StructuredItinerary } from '@/types/itinerary'
-
-// Fix leaflet icon issue in Vue / Webpack / Vite
-import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
-import iconUrl from 'leaflet/dist/images/marker-icon.png'
-import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: iconRetinaUrl,
-  iconUrl: iconUrl,
-  shadowUrl: shadowUrl,
-})
 
 const props = defineProps<{
   itinerary: StructuredItinerary | null
@@ -30,109 +18,79 @@ const props = defineProps<{
 
 const mapContainer = ref<HTMLElement | null>(null)
 const showNoDataHint = ref(false)
-let mapInstance: L.Map | null = null
-let markerGroup: L.LayerGroup | null = null
-let polylineLayer: L.Polyline | null = null
 
-onMounted(() => {
+// 为了避免高德地图实例被 Proxy 代理导致性能或渲染极其卡顿，必须用 shallowRef
+const mapInstance = shallowRef<any>(null)
+let AMapObj: any = null
+let markerList: any[] = []
+let polylineLayer: any = null
+
+onMounted(async () => {
   if (!mapContainer.value) return
-
-  // Initialize Map
-  mapInstance = L.map(mapContainer.value).setView([35.86166, 104.195397], 4) // Center of China
-
-  // Use AutoNavi (GaoDe) Tile Layer, very fast in China
-  L.tileLayer('https://webrd04.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', {
-    maxZoom: 18,
-    attribution: '© GaoDe Map'
-  }).addTo(mapInstance)
-
-  markerGroup = L.layerGroup().addTo(mapInstance)
-
-  // Draw if we already have itinerary
-  if (props.itinerary) {
-    drawItinerary(props.itinerary)
+  
+  // 设置安全密钥，需在加载前设置
+  ;(window as any)._AMapSecurityConfig = {
+    securityJsCode: import.meta.env.VITE_AMAP_SECURITY_CODE || '这里填你的安全密钥',
   }
 
-  // Hack for Leaflet inside Vue Flexbox rendering issue
-  setTimeout(() => {
-    mapInstance?.invalidateSize()
-  }, 300)
+  try {
+    AMapObj = await AMapLoader.load({
+      key: import.meta.env.VITE_AMAP_KEY || '这里填你的API-KEY', // 申请好的Web端开发者Key
+      version: '2.0', // 指定要加载的 JSAPI 的版本
+      plugins: ['AMap.Marker', 'AMap.Polyline', 'AMap.InfoWindow'], // 需要使用的的插件列表
+    })
+
+    mapInstance.value = new AMapObj.Map(mapContainer.value, {
+      center: [104.195397, 35.86166], // 中国中心点坐标
+      zoom: 4, // 初始地图级别
+    })
+
+    if (props.itinerary) {
+      drawItinerary(props.itinerary)
+    }
+  } catch (e) {
+    console.error('高德地图加载失败', e)
+  }
 })
 
 onUnmounted(() => {
-  if (mapInstance) {
-    mapInstance.remove()
-    mapInstance = null
+  if (mapInstance.value) {
+    mapInstance.value.destroy()
+    mapInstance.value = null
   }
 })
 
 watch(() => props.itinerary, (newItinerary) => {
-  drawItinerary(newItinerary)
+  if (mapInstance.value && AMapObj) {
+    drawItinerary(newItinerary)
+  }
 }, { deep: true })
 
-function drawItinerary(itinerary: StructuredItinerary | null) {
-  if (!mapInstance || !markerGroup) return
-  
-  showNoDataHint.value = false
-  markerGroup.clearLayers()
+function clearMap() {
+  if (markerList.length > 0) {
+    mapInstance.value.remove(markerList)
+    markerList = []
+  }
   if (polylineLayer) {
-    mapInstance.removeLayer(polylineLayer)
+    mapInstance.value.remove(polylineLayer)
     polylineLayer = null
   }
+}
+
+function drawItinerary(itinerary: StructuredItinerary | null) {
+  clearMap()
+  showNoDataHint.value = false
 
   if (!itinerary || !itinerary.dailyPlans) return
 
   const coords: [number, number][] = []
-
-  // WGS-84 to GCJ-02 convertor
-  const PI = 3.1415926535897932384626
-  const a = 6378245.0
-  const ee = 0.00669342162296594323
-
-  function transformLat(x: number, y: number) {
-    let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
-    ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
-    ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0
-    ret += (160.0 * Math.sin(y / 12.0 * PI) + 320 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
-    return ret
-  }
-
-  function transformLon(x: number, y: number) {
-    let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
-    ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
-    ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0
-    ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0
-    return ret
-  }
-
-  function outOfChina(lat: number, lon: number) {
-    if (lon < 72.004 || lon > 137.8347) return true
-    if (lat < 0.8293 || lat > 55.8271) return true
-    return false
-  }
-
-  function wgs84togcj02(lon: number, lat: number) {
-    if (outOfChina(lat, lon)) return [lon, lat]
-    let dLat = transformLat(lon - 105.0, lat - 35.0)
-    let dLon = transformLon(lon - 105.0, lat - 35.0)
-    const radLat = lat / 180.0 * PI
-    let magic = Math.sin(radLat)
-    magic = 1 - ee * magic * magic
-    const sqrtMagic = Math.sqrt(magic)
-    dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * PI)
-    dLon = (dLon * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI)
-    const mgLat = lat + dLat
-    const mgLon = lon + dLon
-    return [mgLon, mgLat]
-  }
-
   let dayIndex = 0;
+
   for (const plan of itinerary.dailyPlans) {
     dayIndex++
     if (!plan.activities) continue
 
     for (const activity of plan.activities) {
-      // Find latitude and longitude with string-to-number fallback support
       const rawLon = activity.location?.longitude
       const rawLat = activity.location?.latitude
 
@@ -140,58 +98,121 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
       let lat = typeof rawLat === 'string' ? parseFloat(rawLat) : rawLat
 
       if (Number.isFinite(lon) && Number.isFinite(lat)) {
-        // Fallback constraint in case the AI swaps lon/lat (Latitude must be [-90, 90])
+        // Fallback constraint in case the AI swaps lon/lat
         if (Math.abs(lat as number) > 90 && Math.abs(lon as number) <= 90) {
           const temp = lon
           lon = lat
           lat = temp
         }
 
-        // AI directly supplies WGS-84 usually, but Amap uses GCJ-02.
+        // 高德原生要求使用 GCJ-02，理论上如果是 WGS-84 可以调用 AMap.convertFrom() 进行转换。
+        // 为了稳定、离线的高效转化，我们仍保留之前的转火星坐标公式：
         const [gcjLon, gcjLat] = wgs84togcj02(lon as number, lat as number)
-        const pt: [number, number] = [gcjLat, gcjLon]
-        coords.push(pt)
-        
-        // Add Marker with Custom CSS animation
-        const customIcon = L.divIcon({
-          className: 'custom-poi-marker',
-          html: `
+        coords.push([gcjLon, gcjLat])
+
+        const customHtml = `
+          <div class="custom-poi-marker">
             <div class="poi-pulse"></div>
             <div class="poi-dot">D${dayIndex}</div>
-          `,
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-          popupAnchor: [0, -14]
+          </div>
+        `
+
+        const marker = new AMapObj.Marker({
+          position: [gcjLon, gcjLat],
+          content: customHtml,
+          offset: new AMapObj.Pixel(-14, -14),
+          title: `Day ${dayIndex} - ${activity.name || '景点'}`
         })
 
-        const marker = L.marker(pt, { icon: customIcon })
-        marker.bindPopup(`
-          <div style="font-weight:bold; margin-bottom:4px;">Day ${dayIndex} - ${activity.name || '景点'}</div>
-          <div style="font-size:12px; color:#666;">${activity.location?.address || ''}</div>
-        `)
-        markerGroup.addLayer(marker)
+        // 添加点击信息窗
+        marker.on('click', () => {
+          const infoWindow = new AMapObj.InfoWindow({
+            content: `
+              <div style="padding: 10px; max-width: 250px;">
+                <div style="font-weight:bold; margin-bottom:4px;">Day ${dayIndex} - ${activity.name || '景点'}</div>
+                <div style="font-size:12px; color:#666;">${activity.location?.address || ''}</div>
+              </div>
+            `,
+            offset: new AMapObj.Pixel(0, -20)
+          })
+          infoWindow.open(mapInstance.value, marker.getPosition())
+        })
+
+        markerList.push(marker)
       }
     }
   }
 
   if (coords.length > 0) {
-    // Draw route line connecting the points with animation
-    polylineLayer = L.polyline(coords, { 
-      color: '#1360ff', 
-      weight: 4, 
-      opacity: 0.85, 
-      className: 'animated-route'
-    }).addTo(mapInstance)
-    
-    // Auto fit bounds with a cinematic flyTo animation instead of instant jump
-    mapInstance.flyToBounds(L.latLngBounds(coords), { 
-      padding: [40, 40],
-      duration: 1.5,
-      easeLinearity: 0.25
+    if (markerList.length > 0) {
+      mapInstance.value.add(markerList)
+    }
+
+    // 绘制虚线轨迹
+    polylineLayer = new AMapObj.Polyline({
+      path: coords,
+      isOutline: true,
+      outlineColor: '#fff',
+      borderWeight: 2,
+      strokeColor: '#1360ff',
+      strokeOpacity: 0.85,
+      strokeWeight: 4,
+      strokeStyle: 'dashed',
+      strokeDasharray: [10, 5],
+      lineJoin: 'round',
+      lineCap: 'round',
     })
+    mapInstance.value.add(polylineLayer)
+
+    // 视口自适应
+    mapInstance.value.setFitView(undefined, false, [40, 40, 40, 40])
   } else {
     showNoDataHint.value = true
   }
+}
+
+// ========================
+// WGS-84 to GCJ-02 convertor
+// ========================
+const PI = 3.1415926535897932384626
+const a = 6378245.0
+const ee = 0.00669342162296594323
+
+function transformLat(x: number, y: number) {
+  let ret = -100.0 + 2.0 * x + 3.0 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(y * PI) + 40.0 * Math.sin(y / 3.0 * PI)) * 2.0 / 3.0
+  ret += (160.0 * Math.sin(y / 12.0 * PI) + 320 * Math.sin(y * PI / 30.0)) * 2.0 / 3.0
+  return ret
+}
+
+function transformLon(x: number, y: number) {
+  let ret = 300.0 + x + 2.0 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x))
+  ret += (20.0 * Math.sin(6.0 * x * PI) + 20.0 * Math.sin(2.0 * x * PI)) * 2.0 / 3.0
+  ret += (20.0 * Math.sin(x * PI) + 40.0 * Math.sin(x / 3.0 * PI)) * 2.0 / 3.0
+  ret += (150.0 * Math.sin(x / 12.0 * PI) + 300.0 * Math.sin(x / 30.0 * PI)) * 2.0 / 3.0
+  return ret
+}
+
+function outOfChina(lat: number, lon: number) {
+  if (lon < 72.004 || lon > 137.8347) return true
+  if (lat < 0.8293 || lat > 55.8271) return true
+  return false
+}
+
+function wgs84togcj02(lon: number, lat: number) {
+  if (outOfChina(lat, lon)) return [lon, lat]
+  let dLat = transformLat(lon - 105.0, lat - 35.0)
+  let dLon = transformLon(lon - 105.0, lat - 35.0)
+  const radLat = lat / 180.0 * PI
+  let magic = Math.sin(radLat)
+  magic = 1 - ee * magic * magic
+  const sqrtMagic = Math.sqrt(magic)
+  dLat = (dLat * 180.0) / ((a * (1 - ee)) / (magic * sqrtMagic) * PI)
+  dLon = (dLon * 180.0) / (a / sqrtMagic * Math.cos(radLat) * PI)
+  const mgLat = lat + dLat
+  const mgLon = lon + dLon
+  return [mgLon, mgLat]
 }
 </script>
 
@@ -205,13 +226,13 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
 .dynamic-map-container {
   width: 100%;
   height: 100%;
-  min-height: 420px; /* 确保最小高度，防止在 Flex 布局中塌陷 */
+  min-height: 420px;
   flex: 1;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* slight depth */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   border: 1px solid var(--color-border, #eaeaea);
-  z-index: 1; /* Keep leaflet popups below other absolute popups if any */
+  z-index: 1;
 }
 
 .map-empty-hint {
@@ -228,15 +249,11 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
   line-height: 1.45;
 }
 
-/* Fix z-index issue where Leaflet controls overlap higher-level fixed elements */
-:deep(.leaflet-top),
-:deep(.leaflet-bottom) {
-  z-index: 500 !important;
-}
-
-/* Custom Marker Styling & Animations */
+/* Custom Marker Styling & Animations - 兼容高德直接注入的 HTML */
 :deep(.custom-poi-marker) {
   position: relative;
+  width: 28px;
+  height: 28px;
 }
 
 :deep(.custom-poi-marker .poi-dot) {
@@ -273,15 +290,11 @@ function drawItinerary(itinerary: StructuredItinerary | null) {
   100% { transform: scale(1.6); opacity: 0; }
 }
 
-/* Animated Route Line */
-:deep(.animated-route) {
-  stroke-dasharray: 12, 12;
-  animation: flow-dash 30s linear infinite;
+/* 隐藏高德 logo 和 调整 copyright (可选) */
+:deep(.amap-logo) {
+  display: none !important;
 }
-
-@keyframes flow-dash {
-  to {
-    stroke-dashoffset: -1000;
-  }
+:deep(.amap-copyright) {
+  opacity: 0.5;
 }
 </style>
