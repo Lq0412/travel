@@ -42,3 +42,31 @@ export interface Meal {
   recommendation: string
   estimatedCost?: number
 }
+
+export type StructuredSource = 'stream-marker' | 'sync-metadata' | 'none'
+
+export interface ItineraryResponseMeta {
+  intentType?: string
+  intentDescription?: string
+  structuredAvailable: boolean
+  structuredSource: StructuredSource
+  totalEstimatedCost?: number
+  activityCount?: number
+}
+
+export interface ItineraryDayDiffStat {
+  day: number
+  added: number
+  removed: number
+  updated: number
+}
+
+export interface ItineraryDiffSummary {
+  round: number
+  changedDays: number[]
+  changedNodeKeys: string[]
+  addedCount: number
+  removedCount: number
+  updatedCount: number
+  perDay: ItineraryDayDiffStat[]
+}

@@ -3,18 +3,35 @@
     <!-- 固定在屏幕上的主轴线，像齿轮轨道一样 -->
     <div v-if="timelineNodes.length" class="main-axis fixed-track"></div>
 
+    <div v-if="timelineNodes.length && summaryMeta" class="explain-strip">
+      <span class="explain-pill">{{ summaryMeta.intentLabel }}</span>
+      <span class="explain-pill">结构化来源：{{ summaryMeta.sourceLabel }}</span>
+      <span class="explain-pill">活动数：{{ summaryMeta.activityCount }}</span>
+      <span v-if="summaryMeta.totalEstimatedCost" class="explain-pill">
+        预算约 ¥{{ summaryMeta.totalEstimatedCost }}
+      </span>
+      <template v-if="diffMeta">
+        <span class="explain-pill explain-pill-strong">第 {{ diffMeta.round }} 轮更新</span>
+        <span class="explain-pill">+{{ diffMeta.addedCount }} / -{{ diffMeta.removedCount }} / ~{{ diffMeta.updatedCount }}</span>
+        <span v-if="diffMeta.changedDaysLabel" class="explain-pill">涉及：{{ diffMeta.changedDaysLabel }}</span>
+      </template>
+    </div>
+
     <div v-if="timelineNodes.length" class="timeline-wrapper" @wheel.prevent="onWheel">
       <div class="timeline-scroll-area">
         <div class="timeline-items">
-          <template v-for="(spot, index) in timelineNodes" :key="`${spot.day}-${spot.period}-${index}`">
+          <template v-for="(spot, index) in timelineNodes" :key="spot.nodeKey">
             
             <!-- 天数分隔标记，直接坐在主轴上 -->
             <div v-if="isFirstOfDay(index)" class="day-divider">
-              <div class="day-badge">第 {{ spot.day }} 天</div>
+              <div class="day-badge" :class="{ 'is-changed': dayHasChanged(spot.day) }">第 {{ spot.day }} 天</div>
             </div>
 
             <!-- 时间轴重点节点 -->
-            <div class="timeline-item" :class="index % 2 === 0 ? 'is-top' : 'is-bottom'">
+            <div
+              class="timeline-item"
+              :class="[index % 2 === 0 ? 'is-top' : 'is-bottom', { 'is-changed': spot.isChanged }]"
+            >
               <div class="axis-dot"></div>
               <div class="connector"></div>
               
@@ -31,8 +48,18 @@
                   <div class="card-header">
                     <span class="period-badge" :class="spot.period">{{ periodLabel(spot.period) }}</span>
                     <h4 class="spot-title" :title="spot.name">{{ spot.name }}</h4>
+                    <span v-if="spot.isChanged" class="spot-change-tag">更新</span>
                   </div>
                   <p class="spot-desc">{{ spot.description || '暂无游玩明细，可继续在底部对话框补充需求。' }}</p>
+                  <div
+                    v-if="spot.address || (spot.estimatedCost && spot.estimatedCost > 0)"
+                    class="spot-meta"
+                  >
+                    <span v-if="spot.address" class="meta-address">{{ spot.address }}</span>
+                    <span v-if="spot.estimatedCost && spot.estimatedCost > 0" class="meta-cost">
+                      约 ¥{{ spot.estimatedCost }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -54,20 +81,32 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { Activity, DailyPlan, StructuredItinerary } from '@/types/itinerary'
+import type {
+  Activity,
+  DailyPlan,
+  ItineraryDiffSummary,
+  ItineraryResponseMeta,
+  StructuredItinerary,
+} from '@/types/itinerary'
 
 type DayPeriod = 'morning' | 'noon' | 'evening'
 
 interface TimelineNode {
+  nodeKey: string
   day: number
   period: DayPeriod
   name: string
   description: string
   imageUrl?: string
+  address?: string
+  estimatedCost?: number
+  isChanged?: boolean
 }
 
 const props = defineProps<{
   itinerary?: StructuredItinerary | null
+  meta?: ItineraryResponseMeta | null
+  diff?: ItineraryDiffSummary | null
 }>()
 
 const failedImages = ref<Set<string>>(new Set())
@@ -100,28 +139,100 @@ function periodLabel(period: DayPeriod): string {
   return '晚上'
 }
 
+function positiveNumber(value: unknown): number | undefined {
+  const num = Number(value)
+  return Number.isFinite(num) && num > 0 ? num : undefined
+}
+
+const summaryMeta = computed(() => {
+  if (!timelineNodes.value.length) {
+    return null
+  }
+
+  const intentType = props.meta?.intentType || 'ITINERARY_GENERATION'
+  const intentLabelMap: Record<string, string> = {
+    ITINERARY_GENERATION: '意图：行程规划',
+    ATTRACTION_QUERY: '意图：景点查询',
+    GENERAL_CHAT: '意图：通用聊天',
+  }
+
+  const sourceLabelMap: Record<string, string> = {
+    'stream-marker': '流式结构化标记',
+    'sync-metadata': '同步 metadata 回退',
+    none: '未识别结构化结果',
+  }
+
+  return {
+    intentLabel: intentLabelMap[intentType] || `意图：${intentType}`,
+    sourceLabel: sourceLabelMap[props.meta?.structuredSource || 'none'] || '未识别结构化结果',
+    activityCount: props.meta?.activityCount || timelineNodes.value.length,
+    totalEstimatedCost: props.meta?.totalEstimatedCost || positiveNumber(props.itinerary?.totalEstimatedCost),
+  }
+})
+
+const diffMeta = computed(() => {
+  const diff = props.diff
+  if (!diff) {
+    return null
+  }
+
+  const changedDaysLabel = diff.changedDays.length
+    ? diff.changedDays.map((day) => `第${day}天`).join('、')
+    : ''
+
+  return {
+    round: diff.round,
+    addedCount: diff.addedCount,
+    removedCount: diff.removedCount,
+    updatedCount: diff.updatedCount,
+    changedDaysLabel,
+  }
+})
+
+function dayHasChanged(day: number): boolean {
+  return Boolean(props.diff?.changedDays.includes(day))
+}
+
 const timelineNodes = computed<TimelineNode[]>(() => {
   const plans = ensureArray<DailyPlan>(props.itinerary?.dailyPlans)
   const nodes: TimelineNode[] = []
+  const occurrenceMap = new Map<string, number>()
+  const changedKeys = new Set(props.diff?.changedNodeKeys || [])
 
   plans.forEach((plan) => {
     const activities = ensureArray<Activity>((plan as { activities?: unknown }).activities)
     if (activities.length === 0) {
+      const baseKey = `${plan.day}|noon|自由活动 / 待定`
+      const count = (occurrenceMap.get(baseKey) || 0) + 1
+      occurrenceMap.set(baseKey, count)
+      const nodeKey = `${baseKey}#${count}`
       nodes.push({
+        nodeKey,
         day: plan.day,
         period: 'noon',
         name: '自由活动 / 待定',
         description: '该天行程已暂时留空，你可以继续通过底部的对话以补充你的景点要求。',  
+        isChanged: changedKeys.has(nodeKey),
       })
       return
     }
     activities.forEach((activity) => {
+      const period = normalizePeriod(activity.time)
+      const baseKey = `${plan.day}|${period}|${(activity.name || '').trim().toLowerCase()}`
+      const count = (occurrenceMap.get(baseKey) || 0) + 1
+      occurrenceMap.set(baseKey, count)
+      const nodeKey = `${baseKey}#${count}`
+
       nodes.push({
+        nodeKey,
         day: plan.day,
-        period: normalizePeriod(activity.time),
+        period,
         name: activity.name || '未命名活动',
         description: activity.description || '',
         imageUrl: activity.imageUrl,
+        address: activity.location?.address || '',
+        estimatedCost: positiveNumber(activity.estimatedCost),
+        isChanged: changedKeys.has(nodeKey),
       })
     })
   })
@@ -152,6 +263,30 @@ function onWheel(e: WheelEvent) {
   box-sizing: border-box;
   position: relative;
   overflow: hidden; /* 保证两侧内容滑出范围时被安全裁切，不再越界 */
+}
+
+.explain-strip {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  z-index: 12;
+}
+
+.explain-pill {
+  background: rgba(15, 23, 42, 0.72);
+  color: #f8fafc;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 7px 10px;
+  backdrop-filter: blur(6px);
+}
+
+.explain-pill-strong {
+  background: rgba(28, 91, 224, 0.84);
 }
 
 .timeline-wrapper {
@@ -243,6 +378,11 @@ function onWheel(e: WheelEvent) {
   letter-spacing: 1px;
 }
 
+.day-badge.is-changed {
+  background: linear-gradient(135deg, #f97316, #f59e0b);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+}
+
 /* 节点容器分配固定水平宽度 */
 .timeline-item {
   position: relative;
@@ -252,6 +392,15 @@ function onWheel(e: WheelEvent) {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.timeline-item.is-changed .axis-dot {
+  border-color: #f97316;
+  box-shadow: 0 0 0 6px rgba(249, 115, 22, 0.22);
+}
+
+.timeline-item.is-changed .spot-card {
+  border-color: rgba(249, 115, 22, 0.65);
 }
 
 /* 轴上的原点 */
@@ -376,6 +525,16 @@ function onWheel(e: WheelEvent) {
   text-overflow: ellipsis;
 }
 
+.spot-change-tag {
+  margin-left: auto;
+  font-size: 11px;
+  color: #9a3412;
+  background: rgba(251, 146, 60, 0.2);
+  border: 1px solid rgba(249, 115, 22, 0.5);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
 .spot-desc {
   margin: 0;
   font-size: 13px;
@@ -385,6 +544,31 @@ function onWheel(e: WheelEvent) {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.spot-meta {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.meta-address {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta-cost {
+  font-size: 12px;
+  color: #0f766e;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .empty-state {

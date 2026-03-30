@@ -1,7 +1,8 @@
 import { ref, onBeforeUnmount } from 'vue'
 import type { ChatItem } from '@/types/chat'
-import type { StructuredItinerary } from '@/types/itinerary'
+import type { Activity, DailyPlan, ItineraryResponseMeta, StructuredItinerary } from '@/types/itinerary'
 import { createConversationByUserId } from '@/api/chatConversationClient'
+import { chat1 } from '@/api/aiController'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 import {
   parsePayload,
@@ -15,12 +16,65 @@ function isAbortError(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && 'name' in error && (error as { name?: string }).name === 'AbortError')
 }
 
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : []
+}
+
+function countActivities(itinerary: StructuredItinerary | null): number {
+  if (!itinerary) {
+    return 0
+  }
+
+  const plans = ensureArray<DailyPlan>(itinerary.dailyPlans)
+  return plans.reduce((sum, plan) => {
+    const activities = ensureArray<Activity>((plan as { activities?: unknown }).activities)
+    return sum + activities.length
+  }, 0)
+}
+
+function positiveNumber(value: unknown): number | undefined {
+  const num = Number(value)
+  return Number.isFinite(num) && num > 0 ? num : undefined
+}
+
+function parseStructuredFromText(raw: string): StructuredItinerary | null {
+  const value = (raw || '').trim()
+  if (!value) {
+    return null
+  }
+  try {
+    const parsed = JSON.parse(value) as StructuredItinerary
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.dailyPlans)) {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function buildMeta(
+  source: ItineraryResponseMeta['structuredSource'],
+  itinerary: StructuredItinerary | null,
+  base?: Partial<ItineraryResponseMeta>,
+): ItineraryResponseMeta {
+  return {
+    intentType: base?.intentType,
+    intentDescription: base?.intentDescription,
+    structuredAvailable: Boolean(itinerary),
+    structuredSource: itinerary ? source : 'none',
+    totalEstimatedCost: positiveNumber(itinerary?.totalEstimatedCost),
+    activityCount: itinerary ? countActivities(itinerary) : undefined,
+  }
+}
+
 export function useChatStream() {
   const messages = ref<ChatItem[]>([])
   const isLoading = ref(false)
   const structuredData = ref<StructuredItinerary | null>(null)
   const abortController = ref<AbortController | null>(null)
   const lastStructuredSignature = ref('')
+  const responseMeta = ref<ItineraryResponseMeta | null>(null)
 
   const trySetStructuredData = (
     fullResponseBuffer: string,
@@ -37,6 +91,10 @@ export function useChatStream() {
     }
     lastStructuredSignature.value = signature
 
+    responseMeta.value = buildMeta('stream-marker', structured, {
+      intentType: responseMeta.value?.intentType,
+      intentDescription: responseMeta.value?.intentDescription,
+    })
     structuredData.value = structured
     onStructuredData?.(structured)
     if (import.meta.env.DEV) {
@@ -49,12 +107,92 @@ export function useChatStream() {
     return true
   }
 
+  const tryFallbackStructuredBySync = async (
+    task: string,
+    index: number,
+    onStructuredData?: (data: StructuredItinerary) => void,
+  ): Promise<boolean> => {
+    try {
+      const response = await chat1({
+        message: task,
+        stream: false,
+      })
+
+      if (response.data.code !== 0 || !response.data.data) {
+        return false
+      }
+
+      const aiResponse = response.data.data as API.AIResponse
+      const metadata = (aiResponse.metadata ?? {}) as Record<string, unknown>
+      const intentType = typeof metadata.intentType === 'string' ? metadata.intentType : undefined
+      const intentDescription =
+        typeof metadata.intentDescription === 'string' ? metadata.intentDescription : undefined
+
+      const structuredAvailable =
+        typeof metadata.structuredItineraryAvailable === 'boolean'
+          ? metadata.structuredItineraryAvailable
+          : false
+
+      const rawStructured =
+        typeof metadata.structuredItineraryJson === 'string' ? metadata.structuredItineraryJson : ''
+      const parsed = parseStructuredFromText(rawStructured)
+
+      if (!parsed) {
+        responseMeta.value = {
+          intentType,
+          intentDescription,
+          structuredAvailable,
+          structuredSource: 'none',
+        }
+
+        if (!messages.value[index].text.trim() && aiResponse.content) {
+          messages.value[index].text = filterAIResponse(aiResponse.content) || aiResponse.content
+        }
+
+        return false
+      }
+
+      responseMeta.value = buildMeta('sync-metadata', parsed, {
+        intentType,
+        intentDescription,
+      })
+
+      const signature = JSON.stringify(parsed)
+      if (signature !== lastStructuredSignature.value) {
+        lastStructuredSignature.value = signature
+        structuredData.value = parsed
+        onStructuredData?.(parsed)
+      }
+
+      if (!messages.value[index].text.trim() && aiResponse.content) {
+        messages.value[index].text = filterAIResponse(aiResponse.content) || aiResponse.content
+      }
+
+      if (import.meta.env.DEV) {
+        console.log('[useChatStream] ✅ 已通过同步接口 metadata 回退提取结构化行程', {
+          intentType,
+          intentDescription,
+          destination: parsed.destination,
+          days: parsed.days,
+        })
+      }
+
+      return true
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('[useChatStream] 同步 metadata 回退失败', error)
+      }
+      return false
+    }
+  }
+
   /**
    * 处理流结束时的最终渲染
    */
-  const handleStreamEnd = (
+  const handleStreamEnd = async (
     index: number,
     fullResponseBuffer: string,
+    task: string,
     onScroll: (smooth?: boolean) => void,
     onStructuredData?: (data: StructuredItinerary) => void
   ) => {
@@ -70,9 +208,18 @@ export function useChatStream() {
       const cleaned = removeStructuredDataMarkers(messages.value[index].text)
       if (cleaned) messages.value[index].text = cleaned
       onScroll(false)
+    } else {
+      const resolvedByFallback = await tryFallbackStructuredBySync(task, index, onStructuredData)
+      if (!resolvedByFallback && !responseMeta.value) {
+        responseMeta.value = {
+          structuredAvailable: false,
+          structuredSource: 'none',
+        }
+      }
     }
     if (!messages.value[index].text.trim()) {
-      messages.value[index].text = filterAIResponse(fullResponseBuffer) || removeStructuredDataMarkers(fullResponseBuffer) || fullResponseBuffer
+      messages.value[index].text =
+        filterAIResponse(fullResponseBuffer) || removeStructuredDataMarkers(fullResponseBuffer) || fullResponseBuffer
     }
     isLoading.value = false
   }
@@ -88,6 +235,7 @@ export function useChatStream() {
     console.log('📍 startStream 被调用, task:', task.substring(0, 50), 'conversationId:', conversationId)
     abortController.value?.abort()
     structuredData.value = null
+    responseMeta.value = null
     lastStructuredSignature.value = ''
     isLoading.value = true
 
@@ -163,7 +311,7 @@ export function useChatStream() {
             return
           }
           streamFinished = true
-          handleStreamEnd(index, fullResponseBuffer, onScroll, onStructuredData)
+          void handleStreamEnd(index, fullResponseBuffer, task, onScroll, onStructuredData)
         }
 
         const appendAndRender = (text: string, replaceBuffer = false) => {
@@ -296,5 +444,5 @@ export function useChatStream() {
 
   onBeforeUnmount(() => closeStream())
 
-  return { messages, isLoading, structuredData, startStream, closeStream }
+  return { messages, isLoading, structuredData, responseMeta, startStream, closeStream }
 }

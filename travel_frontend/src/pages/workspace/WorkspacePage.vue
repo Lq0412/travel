@@ -20,7 +20,11 @@
     <section v-if="isLoggedIn" class="planner-stage">
       <div class="stage-content">
         <div class="timeline-panel">
-          <ItineraryTimelineBoard :itinerary="currentItinerary" />
+          <ItineraryTimelineBoard
+            :itinerary="currentItinerary"
+            :meta="responseMeta"
+            :diff="itineraryDiff"
+          />
         </div>
         <div class="map-panel">
           <DynamicMap :itinerary="currentItinerary" />
@@ -77,7 +81,13 @@ import { message } from 'ant-design-vue'
 import ChatInput from '@/pages/user/ChatInput.vue'
 import ItineraryTimelineBoard from '@/pages/workspace/ItineraryTimelineBoard.vue'
 import DynamicMap from '@/pages/workspace/DynamicMap.vue'
-import type { Activity, DailyPlan, StructuredItinerary } from '@/types/itinerary'
+import type {
+  Activity,
+  DailyPlan,
+  ItineraryDayDiffStat,
+  ItineraryDiffSummary,
+  StructuredItinerary,
+} from '@/types/itinerary'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 import { useVisualContent } from '@/composables/useVisualContent'
 import { useChatStream } from '@/composables/useChatStream'
@@ -95,6 +105,8 @@ const isSavingTrip = ref(false)
 const selectedTheme = ref<string>('none')
 const enrichmentVersion = ref(0)
 const lastItinerarySignature = ref('')
+const itineraryDiff = ref<ItineraryDiffSummary | null>(null)
+const itineraryDiffRound = ref(0)
 const imageQueryCache = new Map<string, string>()
 const baseSuggestions = [
   '给我一版 3 天游轻松路线，早中晚各 1 个景点',
@@ -104,7 +116,7 @@ const baseSuggestions = [
 ]
 
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
-const { isLoading, startStream, closeStream, structuredData } = useChatStream()
+const { isLoading, startStream, closeStream, structuredData, responseMeta } = useChatStream()
 const suggestionInputs = computed(() => {
   const destination = currentItinerary.value?.destination?.trim()
   if (!destination) {
@@ -148,6 +160,15 @@ function applyStructuredItinerary(data: StructuredItinerary) {
   }
 
   const normalized = normalizeIncomingItinerary(data)
+  const previous = currentItinerary.value
+  if (!previous) {
+    itineraryDiff.value = null
+    itineraryDiffRound.value = 0
+  } else {
+    itineraryDiffRound.value += 1
+    itineraryDiff.value = buildItineraryDiff(previous, normalized, itineraryDiffRound.value)
+  }
+
   currentItinerary.value = normalized
 
   const currentVersion = ++enrichmentVersion.value
@@ -171,6 +192,9 @@ function resetConversation() {
   lastItinerarySignature.value = ''
   conversationId.value = undefined
   currentItinerary.value = null
+  itineraryDiff.value = null
+  itineraryDiffRound.value = 0
+  responseMeta.value = null
 }
 
 function isUsableImageUrl(rawUrl: string): boolean {
@@ -231,6 +255,108 @@ function ensureArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : []
 }
 
+interface DiffNodeSnapshot {
+  nodeKey: string
+  day: number
+  signature: string
+}
+
+function activityNodeBaseKey(day: number, activity: Activity): string {
+  const time = (activity.time || '').trim().toLowerCase()
+  const name = (activity.name || '').trim().toLowerCase()
+  return `${day}|${time}|${name}`
+}
+
+function activitySignature(activity: Activity): string {
+  const type = (activity.type || '').trim().toLowerCase()
+  const description = (activity.description || '').trim()
+  const address = (activity.location?.address || '').trim()
+  const estimatedCost = Number(activity.estimatedCost || 0)
+  return `${type}@@${description}@@${address}@@${estimatedCost}`
+}
+
+function flattenDiffNodes(itinerary: StructuredItinerary): DiffNodeSnapshot[] {
+  const nodes: DiffNodeSnapshot[] = []
+  const occurrenceMap = new Map<string, number>()
+
+  for (const plan of ensureArray<DailyPlan>(itinerary.dailyPlans)) {
+    const activities = ensureArray<Activity>((plan as { activities?: unknown }).activities)
+    for (const activity of activities) {
+      const baseKey = activityNodeBaseKey(plan.day, activity)
+      const count = (occurrenceMap.get(baseKey) || 0) + 1
+      occurrenceMap.set(baseKey, count)
+
+      nodes.push({
+        nodeKey: `${baseKey}#${count}`,
+        day: plan.day,
+        signature: activitySignature(activity),
+      })
+    }
+  }
+
+  return nodes
+}
+
+function increaseDayStat(dayStats: Map<number, ItineraryDayDiffStat>, day: number, key: 'added' | 'removed' | 'updated') {
+  const current = dayStats.get(day) || { day, added: 0, removed: 0, updated: 0 }
+  current[key] += 1
+  dayStats.set(day, current)
+}
+
+function buildItineraryDiff(
+  previous: StructuredItinerary,
+  current: StructuredItinerary,
+  round: number,
+): ItineraryDiffSummary {
+  const prevNodes = flattenDiffNodes(previous)
+  const currNodes = flattenDiffNodes(current)
+
+  const prevMap = new Map(prevNodes.map((node) => [node.nodeKey, node]))
+  const currMap = new Map(currNodes.map((node) => [node.nodeKey, node]))
+
+  let addedCount = 0
+  let removedCount = 0
+  let updatedCount = 0
+  const changedNodeKeys: string[] = []
+  const dayStats = new Map<number, ItineraryDayDiffStat>()
+
+  for (const [key, currNode] of currMap.entries()) {
+    const prevNode = prevMap.get(key)
+    if (!prevNode) {
+      addedCount += 1
+      changedNodeKeys.push(key)
+      increaseDayStat(dayStats, currNode.day, 'added')
+      continue
+    }
+
+    if (prevNode.signature !== currNode.signature) {
+      updatedCount += 1
+      changedNodeKeys.push(key)
+      increaseDayStat(dayStats, currNode.day, 'updated')
+    }
+  }
+
+  for (const [key, prevNode] of prevMap.entries()) {
+    if (!currMap.has(key)) {
+      removedCount += 1
+      increaseDayStat(dayStats, prevNode.day, 'removed')
+    }
+  }
+
+  const changedDays = Array.from(dayStats.keys()).sort((a, b) => a - b)
+  const perDay = Array.from(dayStats.values()).sort((a, b) => a.day - b.day)
+
+  return {
+    round,
+    changedDays,
+    changedNodeKeys: Array.from(new Set(changedNodeKeys)),
+    addedCount,
+    removedCount,
+    updatedCount,
+    perDay,
+  }
+}
+
 function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItinerary {
   const cloned = JSON.parse(JSON.stringify(source)) as StructuredItinerary
 
@@ -248,30 +374,67 @@ function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItin
         picture?: string
         address?: string
       }
+      type RawLocation = {
+        address?: string
+        latitude?: number | string
+        longitude?: number | string
+        lat?: number | string
+        lng?: number | string
+        coordinates?: [number | string, number | string]
+      }
+
+      const rawObj = activity as unknown as {
+        location?: RawLocation
+        latitude?: number | string
+        longitude?: number | string
+        lat?: number | string
+        lng?: number | string
+        'location.latitude'?: number | string
+        'location.longitude'?: number | string
+      }
+
       const fallbackImage = [raw.imageUrl, raw.image, raw.picture].find(
         (value): value is string => typeof value === 'string' && value.trim().length > 0,
       )
       const candidateImage = activity.imageUrl || fallbackImage || ''
-      const fallbackAddress = typeof raw.address === 'string' ? raw.address : ''
-        const rawObj = activity as any
-        const lat = rawObj.location?.latitude || rawObj.latitude || rawObj['location.latitude'] || rawObj.lat
-        const lon = rawObj.location?.longitude || rawObj.longitude || rawObj['location.longitude'] || rawObj.lng
-        
-        const normalizedLocation = activity.location || { address: fallbackAddress }
-        if (lat !== undefined && lon !== undefined) {
-           normalizedLocation.latitude = Number(lat)
-           normalizedLocation.longitude = Number(lon)
-        }
-        return {
-          ...activity,
-          time: normalizePeriod(activity.time),
-          name: activity.name || '',
-          description: activity.description || '',
-          type: activity.type || 'attraction',
-          imageUrl: isUsableImageUrl(candidateImage) ? candidateImage : '',
-          location: normalizedLocation,
-          estimatedCost: Number(activity.estimatedCost || 0),
-        }
+      const fallbackAddress = typeof raw.address === 'string' ? raw.address.trim() : ''
+      const locationAddress =
+        activity.location?.address?.trim() ||
+        rawObj.location?.address?.trim() ||
+        fallbackAddress ||
+        activity.name?.trim() ||
+        ''
+
+      let lat = rawObj.location?.latitude ?? rawObj.location?.lat ?? rawObj.latitude ?? rawObj['location.latitude'] ?? rawObj.lat
+      let lon = rawObj.location?.longitude ?? rawObj.location?.lng ?? rawObj.longitude ?? rawObj['location.longitude'] ?? rawObj.lng
+
+      if ((lat === undefined || lon === undefined) && Array.isArray(rawObj.location?.coordinates)) {
+        lon = rawObj.location.coordinates[0]
+        lat = rawObj.location.coordinates[1]
+      }
+
+      const normalizedLocation: Activity['location'] = {
+        address: locationAddress,
+      }
+
+      const latNum = Number(lat)
+      const lonNum = Number(lon)
+      if (Number.isFinite(latNum) && Number.isFinite(lonNum)) {
+        normalizedLocation.latitude = latNum
+        normalizedLocation.longitude = lonNum
+        normalizedLocation.coordinates = [lonNum, latNum]
+      }
+
+      return {
+        ...activity,
+        time: normalizePeriod(activity.time),
+        name: activity.name || '',
+        description: activity.description || '',
+        type: activity.type || 'attraction',
+        imageUrl: isUsableImageUrl(candidateImage) ? candidateImage : '',
+        location: normalizedLocation,
+        estimatedCost: Number(activity.estimatedCost || 0),
+      }
     })
     return plan
   })

@@ -27,6 +27,7 @@ const placeSearch = shallowRef<any>(null)
 let markerList: any[] = []
 let polylineLayers: any[] = [] // 改为数组，存储多条路线
 let renderVersion = 0
+const positionCache = new Map<string, [number, number] | null>()
 
 // 定义一组高级感的颜色，用于区分不同天数的路线和标记
 const DAY_COLORS = ['#1360ff', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
@@ -163,10 +164,12 @@ function buildQueryCandidates(itinerary: StructuredItinerary, activity: any): st
   const address = (activity?.location?.address || '').trim()
   const name = (activity?.name || '').trim()
   const candidates = [
-    [destination, address].filter(Boolean).join(' '),
     address,
+    [destination, address].filter(Boolean).join(' '),
+    [address, name].filter(Boolean).join(' '),
     [destination, name].filter(Boolean).join(' '),
     name,
+    destination,
   ]
 
   return Array.from(new Set(candidates.filter((item) => item.length > 0)))
@@ -217,28 +220,81 @@ function searchByPoi(keyword: string, city: string): Promise<[number, number] | 
 }
 
 async function resolveActivityPosition(itinerary: StructuredItinerary, activity: any): Promise<[number, number] | null> {
+  const cacheKey = JSON.stringify({
+    destination: itinerary.destination || '',
+    address: activity?.location?.address || '',
+    name: activity?.name || '',
+    lon: activity?.location?.longitude ?? activity?.longitude ?? activity?.lng,
+    lat: activity?.location?.latitude ?? activity?.latitude ?? activity?.lat,
+  })
+  if (positionCache.has(cacheKey)) {
+    return positionCache.get(cacheKey) || null
+  }
+
   const candidates = buildQueryCandidates(itinerary, activity)
 
+  // 1) 先按“地点/地址”做地理编码（主策略）
   for (const query of candidates) {
     const point = await geocodeByAddress(query)
     if (point) {
+      positionCache.set(cacheKey, point)
       return point
     }
   }
 
-  const keyword = (activity?.name || activity?.location?.address || '').trim()
-  const poiPoint = await searchByPoi(keyword, (itinerary.destination || '').trim())
-  if (poiPoint) {
-    return poiPoint
+  // 2) 地址失败后尝试 POI 检索（仍以地点名称为主）
+  const city = (itinerary.destination || '').trim()
+  const poiKeywords = [
+    (activity?.location?.address || '').trim(),
+    (activity?.name || '').trim(),
+    [city, (activity?.name || '').trim()].filter(Boolean).join(' '),
+  ].filter((v) => v.length > 0)
+
+  for (const keyword of Array.from(new Set(poiKeywords))) {
+    const poiPoint = await searchByPoi(keyword, city)
+    if (poiPoint) {
+      positionCache.set(cacheKey, poiPoint)
+      return poiPoint
+    }
   }
 
-  // 最终兜底：若模型确实给了坐标，仍可显示，避免整日程无点位
+  // 3) 最终兜底才使用经纬度（辅助策略）
   const rawCoordinate = parseRawCoordinate(activity)
   if (rawCoordinate) {
     const [gcjLon, gcjLat] = wgs84togcj02(rawCoordinate[0], rawCoordinate[1])
-    return [gcjLon, gcjLat]
+    const point: [number, number] = [gcjLon, gcjLat]
+    positionCache.set(cacheKey, point)
+    return point
   }
 
+  positionCache.set(cacheKey, null)
+  return null
+}
+
+async function resolveDestinationCenter(destination: string): Promise<[number, number] | null> {
+  const trimmed = (destination || '').trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const cacheKey = `destination:${trimmed}`
+  if (positionCache.has(cacheKey)) {
+    return positionCache.get(cacheKey) || null
+  }
+
+  const geoPoint = await geocodeByAddress(trimmed)
+  if (geoPoint) {
+    positionCache.set(cacheKey, geoPoint)
+    return geoPoint
+  }
+
+  const poiPoint = await searchByPoi(trimmed, trimmed)
+  if (poiPoint) {
+    positionCache.set(cacheKey, poiPoint)
+    return poiPoint
+  }
+
+  positionCache.set(cacheKey, null)
   return null
 }
 
@@ -246,6 +302,7 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
   const currentRender = ++renderVersion
   clearMap()
   showNoDataHint.value = false
+  positionCache.clear()
 
   if (!itinerary || !itinerary.dailyPlans) return
 
@@ -357,6 +414,20 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
     mapInstance.value.setFitView(overlays, false, [60, 60, 60, 60])
   } else {
     showNoDataHint.value = true
+
+    const fallbackCenter = await resolveDestinationCenter(itinerary.destination || '')
+    if (fallbackCenter && mapInstance.value) {
+      const [lng, lat] = fallbackCenter
+      mapInstance.value.setCenter([lng, lat])
+      mapInstance.value.setZoom(11)
+
+      const destinationMarker = new AMapObj.Marker({
+        position: [lng, lat],
+        title: itinerary.destination || '目的地',
+      })
+      markerList = [destinationMarker]
+      mapInstance.value.add(markerList)
+    }
   }
 }
 

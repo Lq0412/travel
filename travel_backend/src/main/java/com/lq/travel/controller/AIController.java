@@ -15,10 +15,12 @@ import com.lq.travel.callback.StreamCallback;
 import com.lq.travel.agent.impl.GenericTravelAgent;
 import com.lq.travel.annotation.AuthCheck;
 import com.lq.travel.model.entity.User;
+import com.lq.travel.model.enums.IntentType;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.lq.travel.util.IntentAwareChatEnhancer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -78,9 +80,13 @@ public class AIController {
             }
             
             log.info("用户 {} 发起AI聊天请求: {}", loginUser.getId(), request.getMessage());
+
+            IntentType intent = IntentAwareChatEnhancer.resolveIntent(request);
+            IntentAwareChatEnhancer.applySystemPromptIfMissing(request, intent);
             
             // 调用AI服务
             AIResponse response = aiService.chat(request);
+            IntentAwareChatEnhancer.enrichResponseMetadata(response, intent);
             
             // 扣减配额
             if (response.getSuccess() && response.getTokensUsed() != null) {
