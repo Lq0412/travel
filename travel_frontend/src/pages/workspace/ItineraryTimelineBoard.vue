@@ -2,25 +2,6 @@
   <div class="timeline-board">
     <!-- 移除了外层的 main-axis fixed-track -->
 
-    <div v-if="timelineNodes.length && summaryMeta" class="meta-dropdown" @click.stop>
-      <button type="button" class="meta-trigger" @click="toggleMetaDropdown">
-        行程识别信息
-      </button>
-      <div v-show="metaDropdownOpen" class="meta-panel">
-        <div class="meta-row">{{ summaryMeta.intentLabel }}</div>
-        <div class="meta-row">结构化来源：{{ summaryMeta.sourceLabel }}</div>
-        <div class="meta-row">活动数：{{ summaryMeta.activityCount }}</div>
-        <div v-if="summaryMeta.totalEstimatedCost" class="meta-row">
-          预算约 ¥{{ summaryMeta.totalEstimatedCost }}
-        </div>
-        <template v-if="diffMeta">
-          <div class="meta-row meta-row-strong">第 {{ diffMeta.round }} 轮更新</div>
-          <div class="meta-row">+{{ diffMeta.addedCount }} / -{{ diffMeta.removedCount }} / ~{{ diffMeta.updatedCount }}</div>
-          <div v-if="diffMeta.changedDaysLabel" class="meta-row">涉及：{{ diffMeta.changedDaysLabel }}</div>
-        </template>
-      </div>
-    </div>
-
     <div v-if="timelineNodes.length" class="timeline-shell">
       <div class="main-axis fixed-track"></div>
 

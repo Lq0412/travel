@@ -2,7 +2,36 @@
   <div class="workspace-page">
     <header class="page-header">
       <div class="header-actions">
-        <a-button v-if="isLoggedIn" type="link" @click="resetConversation">新会话</a-button>
+        <a-dropdown v-if="isLoggedIn && conversations.length > 0" placement="bottomRight" :trigger="['click']" :overlayStyle="{ maxHeight: '400px', overflowY: 'auto' }">
+          <a-button type="link" class="conv-trigger-btn">
+            {{ currentConversationTitle }} <DownOutlined style="font-size: 10px; margin-left: 4px;" />
+          </a-button>
+          <template #overlay>
+            <a-menu class="workspace-conv-menu" :selectedKeys="conversationId ? [conversationId] : []">
+              <a-menu-item key="new-conversation" @click="resetConversation" style="padding: 10px 16px;">
+                <strong style="color: #3b6edc;"><PlusOutlined style="margin-right: 4px;" /> 新会话</strong>
+              </a-menu-item>
+              <a-menu-divider />
+              <a-menu-item
+                v-for="conv in conversations"
+                :key="String(conv.id)"
+                @click="selectConversation(conv)"
+                style="padding: 10px 16px; min-width: 220px;"
+              >
+                <div class="conv-menu-item" style="display: flex; flex-direction: column; gap: 4px;">
+                  <div class="conv-title" :style="{ fontSize: '14px', color: String(conv.id) === conversationId ? '#3b6edc' : '#333', fontWeight: String(conv.id) === conversationId ? 600 : 400 }">
+                    {{ summarizeConversation(conv).title }}
+                  </div>
+                  <div class="conv-time" style="font-size: 12px; color: #999;">
+                    {{ summarizeConversation(conv).timeLabel }}
+                  </div>
+                </div>
+              </a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+        <a-button v-else-if="isLoggedIn" type="link" @click="resetConversation">新会话</a-button>
+
         <a-button
           v-if="isLoggedIn && currentItinerary"
           type="primary"
@@ -78,9 +107,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import ChatInput from '@/pages/user/ChatInput.vue'
 import ItineraryTimelineBoard from '@/pages/workspace/ItineraryTimelineBoard.vue'
 import DynamicMap from '@/pages/workspace/DynamicMap.vue'
@@ -92,9 +122,13 @@ import type {
   StructuredItinerary,
 } from '@/types/itinerary'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
+import { useWorkspaceConversations } from '@/composables/useWorkspaceConversations'
 import { useVisualContent } from '@/composables/useVisualContent'
 import { useChatStream } from '@/composables/useChatStream'
 import { saveTrip } from '@/api/tripController'
+import { getConversationMessagesById } from '@/api/chatConversationClient'
+import { extractStructuredData } from '@/utils/chatStreamParser'
+import { buildConversationTitle, summarizeConversation } from '@/utils/workspaceSession'
 
 type DayPeriod = 'morning' | 'noon' | 'evening'
 type ActivityType = 'attraction' | 'transport' | 'rest' | 'meal'
@@ -105,6 +139,8 @@ const { illustrations, fetchFirst } = useVisualContent()
 
 const currentItinerary = ref<StructuredItinerary | null>(null)
 const conversationId = ref<string | undefined>(undefined)
+const currentConversationTitle = ref('新会话')
+const lastGeneratedAt = ref('')
 const isSavingTrip = ref(false)
 const selectedTheme = ref<string>('none')
 const enrichmentVersion = ref(0)
@@ -123,6 +159,12 @@ const ALLOWED_ACTIVITY_TYPES = new Set<ActivityType>(['attraction', 'transport',
 
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
 const { isLoading, startStream, closeStream, structuredData, responseMeta } = useChatStream()
+const {
+  conversations,
+  loading: conversationsLoading,
+  refreshConversations,
+  upsertConversation,
+} = useWorkspaceConversations(() => loginUserStore.loginUser.id)
 const suggestionInputs = computed(() => {
   const destination = currentItinerary.value?.destination?.trim()
   if (!destination) {
@@ -176,6 +218,7 @@ function applyStructuredItinerary(data: StructuredItinerary) {
   }
 
   currentItinerary.value = normalized
+  lastGeneratedAt.value = new Date().toISOString()
 
   const currentVersion = ++enrichmentVersion.value
   void enrichItineraryImages(normalized).then((enriched) => {
@@ -201,10 +244,70 @@ function resetConversation() {
   enrichmentVersion.value += 1
   lastItinerarySignature.value = ''
   conversationId.value = undefined
+  currentConversationTitle.value = '新会话'
+  lastGeneratedAt.value = ''
   currentItinerary.value = null
   itineraryDiff.value = null
   itineraryDiffRound.value = 0
   responseMeta.value = null
+}
+
+async function selectConversation(conversation: API.AIConversationVO) {
+  if (!conversation.id) {
+    return
+  }
+
+  conversationId.value = String(conversation.id)
+  currentConversationTitle.value = conversation.title?.trim() || '新会话'
+  lastGeneratedAt.value = conversation.updateTime || conversation.createTime || ''
+  
+  // 清理当前状态，避免展示旧的行程卡片
+  enrichmentVersion.value += 1
+  lastItinerarySignature.value = ''
+  currentItinerary.value = null
+  itineraryDiff.value = null
+  itineraryDiffRound.value = 0
+  responseMeta.value = null
+
+  try {
+    const userId = loginUserStore.loginUser.id
+    if (!userId) return
+
+    const resp = await getConversationMessagesById(conversation.id, userId)
+    if (resp?.data?.code === 0 && resp.data.data) {
+      const messages = resp.data.data
+      // 从后往前找AI回复
+      const aiMsgs = messages.filter((msg: any) => msg.role === 'assistant' || msg.role === 'ai')
+      for (let i = aiMsgs.length - 1; i >= 0; i--) {
+        const aiMsg = aiMsgs[i]
+        if (aiMsg?.content) {
+          // 1. 尝试从流式标记中提取
+          const parsed = extractStructuredData(aiMsg.content)
+          if (parsed) {
+            applyStructuredItinerary(parsed)
+            message.success('已恢复会话行程上下文')
+            return
+          }
+          
+          // 2. 尝试直接作为 JSON 解析（兼容同步返回场景）
+          try {
+            const directJson = JSON.parse(aiMsg.content)
+            if (directJson && typeof directJson === 'object' && Array.isArray(directJson.dailyPlans)) {
+              applyStructuredItinerary(directJson)
+              message.success('已恢复会话行程上下文')
+              return
+            }
+          } catch {
+            // 解析失败忽略，继续找上一条消息
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('加载会话历史内容失败', error)
+  }
+
+  message.info('已切换会话上下文，继续输入即可沿用这条会话')
 }
 
 function isUsableImageUrl(rawUrl: string): boolean {
@@ -627,7 +730,7 @@ function buildPlannerPrompt(userInput: string): string {
     themeInstruction = '【偏好要求：大学生特种兵打卡游】必须是高性价比、高密度的行程。包含网红打卡点、高性价比夜市和小吃街，不强制高品质酒店，主打一个高效低预算游玩。'
   }
 
-  const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。dailyPlans.activities 中每个景点必须包含：time（morning/noon/evening）、name、description、type、location（必须包含 address，地址要尽量具体到景区/街道/商圈；longitude、latitude 为可选字段，如提供请使用标准WGS84小数经纬度）、estimatedCost、imageUrl。'
+const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。\n【重要规划原则：酒店与顺路】行程必须基于真实的地理位置和交通可达性，遵循“就近顺路”的动线规划，严禁跨区折返跑。最好结合目的地合理安排默认酒店（标注为住宿/休息类型），每天早出晚归形成清晰的路径闭环（即使未指定具体的名称也需要占位）。\ndailyPlans.activities 中每个景点必须包含：time（morning/noon/evening）、name、description、type、location（必须包含 address，地址要尽量具体到景区/街道/商圈；longitude、latitude 为可选字段，如提供请使用标准WGS84小数经纬度）、estimatedCost、imageUrl。'
 
   return `${userInput}\n\n${themeInstruction ? themeInstruction + '\n\n' : ''}${baseConstraint}`
 }
@@ -638,6 +741,7 @@ async function handleSendMessage(text: string) {
     return
   }
 
+  const optimisticTitle = buildConversationTitle(prompt)
   const enhancedTask = buildPlannerPrompt(prompt)
   await startStream(
     enhancedTask,
@@ -645,9 +749,19 @@ async function handleSendMessage(text: string) {
     () => {},
     (newConversationId: string) => {
       conversationId.value = newConversationId
+      currentConversationTitle.value = optimisticTitle
+      const now = new Date().toISOString()
+      lastGeneratedAt.value = now
+      upsertConversation({
+        id: Number(newConversationId),
+        title: optimisticTitle,
+        createTime: now,
+        updateTime: now,
+      })
     },
     (data: StructuredItinerary) => {
       applyStructuredItinerary(data)
+      void refreshConversations()
     },
     prompt
   )
@@ -659,6 +773,45 @@ function applySuggestion(suggestion: string) {
 
 onUnmounted(() => {
   closeStream()
+})
+
+watch(
+  isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) {
+      void refreshConversations()
+      return
+    }
+
+    conversationId.value = undefined
+    currentConversationTitle.value = '新会话'
+    lastGeneratedAt.value = ''
+  },
+  { immediate: true },
+)
+
+watch(
+  conversations,
+  (items) => {
+    if (!conversationId.value) {
+      return
+    }
+
+    const currentConversation = items.find((item) => String(item.id) === conversationId.value)
+    if (!currentConversation) {
+      return
+    }
+
+    currentConversationTitle.value = currentConversation.title?.trim() || currentConversationTitle.value
+    lastGeneratedAt.value = currentConversation.updateTime || currentConversation.createTime || lastGeneratedAt.value
+  },
+  { deep: true },
+)
+
+onMounted(() => {
+  if (isLoggedIn.value) {
+    void refreshConversations()
+  }
 })
 </script>
 

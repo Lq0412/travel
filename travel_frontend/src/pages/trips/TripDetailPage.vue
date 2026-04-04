@@ -68,6 +68,14 @@
               <strong>{{ trip.photos?.length || 0 }}</strong>
               <span>已关联照片</span>
             </div>
+            <div class="overview-item">
+              <strong>{{ totalHighlightCount }}</strong>
+              <span>可展示亮点</span>
+            </div>
+            <div class="overview-item">
+              <strong>{{ formatWorkflowDateTime(trip.updateTime || trip.createTime) }}</strong>
+              <span>最近推进</span>
+            </div>
           </div>
         </div>
       </div>
@@ -96,9 +104,14 @@
     <section v-else-if="activeTab === 'photos'" class="content-card">
       <div class="card-head">
         <h2>照片管理</h2>
-        <p>在这一页完成照片关联和管理。</p>
+        <p>把旅行素材和行程结果关联起来，形成答辩时可演示的完整资产页。</p>
       </div>
-      <p style="color: var(--color-muted);">照片上传功能开发中...</p>
+      <TripPhotoManager
+        v-if="trip?.id"
+        :trip-id="Number(trip.id)"
+        :initial-photos="trip.photos || []"
+        @photos-changed="handlePhotosChanged"
+      />
     </section>
   </div>
 </template>
@@ -112,6 +125,7 @@ import {
   getTripById,
 } from '@/api/tripController'
 import PexelsCredit from '@/components/content/PexelsCredit.vue'
+import TripPhotoManager from '@/components/trips/TripPhotoManager.vue'
 import { useVisualContent } from '@/composables/useVisualContent'
 import {
   formatWorkflowDate,
@@ -152,6 +166,10 @@ const highlightEntries = computed(() => {
     }))
     .filter((item) => item.items.length > 0)
 })
+
+const totalHighlightCount = computed(() =>
+  highlightEntries.value.reduce((sum, item) => sum + item.items.length, 0),
+)
 
 function syncTabFromRoute() {
   const nextTab = route.query.tab
@@ -236,6 +254,17 @@ async function markCompleted() {
     message.error(errorMsg)
   } finally {
     completing.value = false
+  }
+}
+
+function handlePhotosChanged(photos: API.TripPhotoVO[]) {
+  if (!trip.value) {
+    return
+  }
+
+  trip.value = {
+    ...trip.value,
+    photos,
   }
 }
 

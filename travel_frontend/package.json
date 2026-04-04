@@ -9,6 +9,7 @@
     "openapi": "node openapi.config.js",
     "preview": "vite preview",
     "build-only": "vite build",
+    "test": "vitest run",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix",
     "format": "prettier --write src/"
@@ -42,6 +43,7 @@
     "typescript": "~5.6.3",
     "vite": "^6.0.1",
     "vite-plugin-vue-devtools": "^7.6.5",
+    "vitest": "^3.2.4",
     "vue-tsc": "^2.1.10"
   }
 }

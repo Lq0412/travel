@@ -26,6 +26,24 @@
         </div>
       </div>
     </section>
+
+    <section class="value-grid">
+      <article class="value-card">
+        <span class="value-label">AI 规划</span>
+        <h2>围绕一个工作台完成生成、调整和保存</h2>
+        <p>把对话、结构化行程和地图联动收在同一条主链路里，便于演示与答辩讲解。</p>
+      </article>
+      <article class="value-card">
+        <span class="value-label">结果沉淀</span>
+        <h2>从一次生成延伸到可追溯的行程资产</h2>
+        <p>我的行程、详情页、照片资产形成闭环，让结果不仅能看，还能继续推进。</p>
+      </article>
+      <article class="value-card">
+        <span class="value-label">后台证明</span>
+        <h2>AI 监控台单独承接 RAG 与任务调度证明</h2>
+        <p>把系统健康、向量规模、同步结果和任务状态收拢到后台区域，前后台职责更清楚。</p>
+      </article>
+    </section>
   </div>
 </template>
 
@@ -67,10 +85,11 @@ onMounted(loadVisuals)
 }
 
 .hero {
-  padding: 60px 48px;
-  border-radius: 32px;
-  background: linear-gradient(135deg, #f0f6ff 0%, #fff9f2 100%);
-  box-shadow: 0 20px 60px rgba(18, 52, 97, 0.08);
+  padding: 44px 40px;
+  border-radius: 28px;
+  border: 1px solid rgba(15, 28, 46, 0.08);
+  background: linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+  box-shadow: 0 16px 48px rgba(18, 52, 97, 0.06);
 }
 
 .hero-content {
@@ -140,8 +159,50 @@ onMounted(loadVisuals)
   max-height: 400px;
 }
 
+.value-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.value-card {
+  padding: 24px;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 28, 46, 0.08);
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(18, 52, 97, 0.04);
+}
+
+.value-label {
+  display: inline-flex;
+  margin-bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(59, 110, 220, 0.08);
+  color: var(--primary-700);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.value-card h2 {
+  margin: 0 0 10px;
+  font-size: 22px;
+  color: var(--color-text);
+}
+
+.value-card p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
 @media (max-width: 1200px) {
   .hero {
+    grid-template-columns: 1fr;
+  }
+
+  .value-grid {
     grid-template-columns: 1fr;
   }
 }

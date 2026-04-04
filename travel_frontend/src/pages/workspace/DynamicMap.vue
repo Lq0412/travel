@@ -45,7 +45,7 @@ onMounted(async () => {
     AMapObj = await AMapLoader.load({
       key: import.meta.env.VITE_AMAP_KEY || '这里填你的API-KEY', // 申请好的Web端开发者Key
       version: '2.0', // 指定要加载的 JSAPI 的版本
-      plugins: ['AMap.Marker', 'AMap.Polyline', 'AMap.InfoWindow', 'AMap.Geocoder', 'AMap.PlaceSearch'],
+      plugins: ['AMap.Marker', 'AMap.Polyline', 'AMap.InfoWindow', 'AMap.Geocoder', 'AMap.PlaceSearch', 'AMap.Driving'],
     })
 
     mapInstance.value = new AMapObj.Map(mapContainer.value, {
@@ -409,13 +409,19 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
 
       const marker = new AMapObj.Marker({
         position: [displayLng, displayLat],
-        title: `Day ${currentDay} - ${activity.name || '景点'}`,
+        title: `第${currentDay}天 - ${activity.name || '景点'}`,
       })
       if (typeof marker.setLabel === 'function') {
+        const timeRank = periodRank(activity?.time)
+        let emoji = timeRank === 1 ? '🌅' : timeRank === 2 ? '☀️' : timeRank === 3 ? '🌙' : '📌'
+        const nameOrDesc = (activity?.name || '') + (activity?.description || '')
+        if (activity?.type === 'rest' || nameOrDesc.includes('酒店') || nameOrDesc.includes('民宿') || nameOrDesc.includes('住')) {
+          emoji = '🏨'
+        }
         marker.setLabel({
           direction: 'top',
           offset: new AMapObj.Pixel(0, -8),
-          content: `<span style="display:inline-block;background:${dayColor};color:#fff;padding:2px 6px;border-radius:999px;font-size:11px;font-weight:600;">D${currentDay}</span>`,
+          content: `<span style="display:inline-block;background:#fff;border:1px solid ${dayColor};color:${dayColor};padding:2px 8px;border-radius:999px;font-size:12px;font-weight:bold;box-shadow:0 2px 6px rgba(0,0,0,0.1);"><span style="margin-right:4px">${emoji}</span>${activity.name || '景点'}</span>`,
         })
       }
 
@@ -423,7 +429,7 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
         const infoWindow = new AMapObj.InfoWindow({
           content: `
             <div style="padding: 10px; max-width: 250px;">
-              <div style="font-weight:bold; margin-bottom:4px; color:${dayColor};">Day ${currentDay} - ${activity.name || '景点'}</div>
+              <div style="font-weight:bold; margin-bottom:4px; color:${dayColor};">第${currentDay}天 - ${activity.name || '景点'}</div>
               <div style="font-size:12px; color:#666;">${activity.location?.address || ''}</div>
             </div>
           `,
@@ -449,62 +455,142 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
 
     polylineLayers = []
 
-    // 按天绘制并带有方向提示的连线
-    Object.keys(dayCoordsMap).forEach(dayKey => {
+    // 按天绘制并带有方向提示的真实路线
+    for (const dayKey of Object.keys(dayCoordsMap)) {
       const dIndex = parseInt(dayKey)
       const dayPts = dayCoordsMap[dIndex]
       const color = DAY_COLORS[(dIndex - 1) % DAY_COLORS.length]
 
-      // 仅当该天有超过1个点时才连线
+      // 仅当该天有超过1个点时才进行路线规划
       if (dayPts.length > 1) {
-        const polyline = new AMapObj.Polyline({
-          path: dayPts,
-          isOutline: true,
-          outlineColor: '#ffffff',
-          borderWeight: 2,
-          strokeColor: color,
-          strokeOpacity: 0.9,
-          strokeWeight: 6,
-          // 开启方向箭头，让路线有流动感
-          showDir: true,
-          lineJoin: 'round',
-          lineCap: 'round',
-        })
-        polylineLayers.push(polyline)
+        const driving = new AMapObj.Driving({
+          map: mapInstance.value,
+          hideMarkers: true,
+          showTraffic: false,
+          autoFitView: false
+        });
+        
+        const origin = dayPts[0];
+        const destination = dayPts[dayPts.length - 1];
+        const waypoints = dayPts.slice(1, dayPts.length - 1);
+        
+        driving.search(new AMapObj.LngLat(origin[0], origin[1]), new AMapObj.LngLat(destination[0], destination[1]), {
+          waypoints: waypoints.map(pt => new AMapObj.LngLat(pt[0], pt[1]))
+        }, (status: string, result: any) => {
+          if (status === 'complete' && result.routes && result.routes.length) {
+            const path: any[] = [];
+            result.routes[0].steps.forEach((step: any) => {
+              step.path.forEach((pt: any) => {
+                path.push([pt.lng, pt.lat]);
+              });
+            });
+            const polyline = new AMapObj.Polyline({
+              path: path,
+              isOutline: true,
+              outlineColor: '#ffffff',
+              borderWeight: 2,
+              strokeColor: color,
+              strokeOpacity: 0.9,
+              strokeWeight: 6,
+              showDir: true,
+              lineJoin: 'round',
+              lineCap: 'round',
+            })
+            mapInstance.value.add(polyline);
+            polylineLayers.push(polyline);
+          } else {
+             // 如果路线规划失败，降级为直接连线
+             const fallbackPolyline = new AMapObj.Polyline({
+              path: dayPts,
+              isOutline: true,
+              outlineColor: '#ffffff',
+              borderWeight: 2,
+              strokeColor: color,
+              strokeOpacity: 0.9,
+              strokeWeight: 6,
+              showDir: true,
+              lineJoin: 'round',
+              lineCap: 'round',
+              strokeStyle: 'dashed',
+            })
+            mapInstance.value.add(fallbackPolyline);
+            polylineLayers.push(fallbackPolyline);
+          }
+        });
       }
-    })
+    }
 
-    // 如果每天都只有一个点，回退为“全程连线”，避免用户看不到任何路线
-    if (polylineLayers.length === 0 && totalPointsCount > 1) {
+    // 如果每天都有且只有一个点，回退为“全程连线”
+    if (totalPointsCount === Object.keys(dayCoordsMap).length && totalPointsCount > 1) {
       const allPoints = Object.keys(dayCoordsMap)
         .map((key) => Number(key))
         .sort((a, b) => a - b)
         .flatMap((day) => dayCoordsMap[day] || [])
       if (allPoints.length > 1) {
-        const fallbackPolyline = new AMapObj.Polyline({
-          path: allPoints,
-          isOutline: true,
-          outlineColor: '#ffffff',
-          borderWeight: 2,
-          strokeColor: '#1360ff',
-          strokeOpacity: 0.85,
-          strokeWeight: 5,
-          showDir: true,
-          lineJoin: 'round',
-          lineCap: 'round',
-          strokeStyle: 'dashed',
-        })
-        polylineLayers.push(fallbackPolyline)
+        const driving = new AMapObj.Driving({
+          map: mapInstance.value,
+          hideMarkers: true,
+          showTraffic: false,
+          autoFitView: false
+        });
+        
+        const origin = allPoints[0];
+        const destination = allPoints[allPoints.length - 1];
+        const waypoints = allPoints.slice(1, allPoints.length - 1);
+        
+        driving.search(new AMapObj.LngLat(origin[0], origin[1]), new AMapObj.LngLat(destination[0], destination[1]), {
+          waypoints: waypoints.map(pt => new AMapObj.LngLat(pt[0], pt[1]))
+        }, (status: string, result: any) => {
+          if (status === 'complete' && result.routes && result.routes.length) {
+            const path: any[] = [];
+            result.routes[0].steps.forEach((step: any) => {
+              step.path.forEach((pt: any) => {
+                path.push([pt.lng, pt.lat]);
+              });
+            });
+            const fallbackPolyline = new AMapObj.Polyline({
+              path: path,
+              isOutline: true,
+              outlineColor: '#ffffff',
+              borderWeight: 2,
+              strokeColor: '#1360ff',
+              strokeOpacity: 0.85,
+              strokeWeight: 5,
+              showDir: true,
+              lineJoin: 'round',
+              lineCap: 'round',
+              strokeStyle: 'solid',
+            })
+            mapInstance.value.add(fallbackPolyline);
+            polylineLayers.push(fallbackPolyline);
+          } else {
+             // 失败则直线兜底
+             const fallbackPolyline = new AMapObj.Polyline({
+              path: allPoints,
+              isOutline: true,
+              outlineColor: '#ffffff',
+              borderWeight: 2,
+              strokeColor: '#1360ff',
+              strokeOpacity: 0.85,
+              strokeWeight: 5,
+              showDir: true,
+              lineJoin: 'round',
+              lineCap: 'round',
+              strokeStyle: 'dashed',
+            })
+            mapInstance.value.add(fallbackPolyline);
+            polylineLayers.push(fallbackPolyline);
+          }
+        });
       }
     }
 
-    if (polylineLayers.length > 0) {
-      mapInstance.value.add(polylineLayers)
-    }
-
-    // 视口自适应
-    const overlays = [...markerList, ...polylineLayers]
-    mapInstance.value.setFitView(overlays, false, [60, 60, 60, 60])
+    // 视口自适应由于异步搜索的原因，这里可能取不到全线的边界，但能自适应所有marker点
+    // 视口自适应延时让路线先画上
+    setTimeout(() => {
+      const overlays = [...markerList, ...polylineLayers]
+      mapInstance.value.setFitView(overlays, false, [60, 60, 60, 60])
+    }, 800)
   } else {
     showNoDataHint.value = true
 

@@ -2,32 +2,31 @@
 
 本目录是「智能 AI 旅游推荐平台」的后端服务，基于 Spring Boot 3.5.5 + Java 21 构建，提供 AI 行程规划、行程管理、回忆图生成、数字人对话、电商与社区等 REST API，供前端 `travel_frontend` 调用。
 
-## 功能概览
+## 当前实现重点
 
-- **AI 智能助手**
-  - 接入通义千问（DashScope），支持文本对话、SSE 流式输出、上下文记忆。
-  - ReAct Agent 架构，内置意图识别（行程规划 / 景点查询 / 普通聊天）。
-  - 支持配额控制及基于 Resilience4j 的限流注解（例如 `@ApiRateLimit`）。
+当前后端优先服务“课程 / 比赛展示型 AI 旅行产品”的主链路，核心是支撑前端可完整演示：
 
-- **AI 行程规划与管理**
-  - 根据目的地、天数、预算、主题生成 1–2 个候选行程方案。
-  - 返回结构化 JSON 字段 `structured_data`，便于前端展示与后续扩展。
-  - 支持保存行程、查看列表及详情、标记完成、删除、发布论坛帖子等操作。
+- **AI 旅行工作台**
+  - `/api/ai/tourism/stream` 提供流式规划能力。
+  - 内置意图识别、结构化结果提取、对话上下文与消息持久化。
+  - 支持限流和用户配额控制。
 
-- **行程媒体与回忆图**
-  - 支持行程照片上传（单张 / 批量），文件存储接入腾讯云 COS。
-  - 使用 DashScope 图像模型生成「回忆卡片」，支持异步任务、轮询、失败重试。
-  - 提供回忆图历史版本查询与回退能力。
+- **行程管理**
+  - `/api/ai/trips/*` 提供保存、我的行程、详情、完成、删除等能力。
+  - 结构化行程以 JSON 形式沉淀，供前端时间轴与地图展示。
 
-- **数字人实时对话**
-  - 对接外部数字人服务（如 `DH_live`），提供纯文本流接口。
-  - 支持在前端以 iframe 方式嵌入数字人交互界面。
+- **照片资产**
+  - `/api/trips/{tripId}/photos*` 提供基于 URL 的照片关联、查询、删除。
+  - 当前前端主版本使用这一套接口形成“行程详情 + 照片资产”的演示闭环。
 
-- **业务与系统功能**
-  - 用户、商家、管理员多角色权限体系。
-  - 商家及商品管理、购物车、订单管理等电商能力。
-  - 留言墙、社区论坛等社区互动模块。
-  - 统一的错误处理、日志及基础响应模型。
+- **AI 监控与知识库调度**
+  - `/api/ai/monitor/*` 提供健康检查、Milvus 查询与同步。
+  - `/api/ai/tasks/*` 提供知识补齐任务投递和状态查询。
+
+## 当前不作为主版本承诺的范围
+
+- 电商、论坛、留言墙、数字人等模块即使仓库中存在相关代码，也不作为当前主导航和主演示路径的一部分。
+- 这些能力更适合作为后续扩展方向，而不是当前评审重点。
 
 ## 技术栈
 
@@ -140,7 +139,7 @@ mvn spring-boot:run
 
 ## 常用 API（概览）
 
-仅列出与 AI 模块相关的核心接口，完整定义请以实际代码和接口文档为准。
+仅列出当前前端主版本真实依赖的核心接口，完整定义请以实际代码和接口文档为准。
 
 - **AI 对话**
   - `POST /api/ai/chat`：流式对话接口，支持通义千问大模型。
@@ -149,32 +148,30 @@ mvn spring-boot:run
   - `POST /api/ai/monitor/rag/milvus/sync`：触发 Milvus 全量知识同步，可选重建集合。
   - `GET  /api/ai/monitor/rag/milvus/query-count`：基于 `entities/query` 返回当前可查询条数（兼容 `entities/count` 不可用场景）。
 
-- **AI 行程规划**
+- **AI 行程规划与沉淀**
   - `POST /api/ai/trips/generate`：根据目的地 / 天数 / 预算 / 主题生成行程方案。
-  - `POST /api/ai/trips/save`：保存行程与 `structured_data`。
+  - `POST /api/ai/trips/save`：保存行程与结构化 JSON。
   - `GET  /api/ai/trips/my`：查询当前用户的所有行程。
   - `GET  /api/ai/trips/{id}`：查看行程详情。
   - `POST /api/ai/trips/{id}/complete`：标记行程完成。
   - `DELETE /api/ai/trips/{id}`：删除行程。
-  - `POST /api/ai/trips/{id}/publish-forum`：将行程发布到论坛。
 
-- **行程照片与回忆图**
+- **行程照片**
   - `POST /api/trips/{tripId}/photos`：上传单张行程照片。
   - `POST /api/trips/{tripId}/photos/batch`：批量上传行程照片。
   - `GET  /api/trips/{tripId}/photos`：查询行程照片。
   - `DELETE /api/trips/photos/{photoId}`：删除照片。
-  - `POST /api/ai/images/memory-card`：基于选定照片创建回忆图任务。
-  - `GET  /api/ai/images/memory-card/status/{taskId}`：轮询任务状态。
-  - `GET  /api/ai/images/memory-card/trip/{tripId}`：查询当前生效的回忆图。
-  - `GET  /api/ai/images/memory-card/history/{tripId}`：查询回忆图历史。
-  - `POST /api/ai/images/memory-card/{tripId}/regenerate`：重新生成回忆图。
-  - `POST /api/ai/images/memory-card/history/{historyId}/set-current`：将历史版本设置为当前。
 
 ## 与前端协同
 
 - 前端代码位于同一仓库的 `travel_frontend` 目录。
 - 开发时建议先启动后端，再在 `travel_frontend` 中执行 `npm run dev` 启动前端开发服务器。
-- 数据接口约定和字段命名已在代码和接口文档中保持一致，新增字段（如 `structured_data`、回忆图相关字段）均已在前端对接。
+- 当前主版本对齐的前端页面为：首页、工作台、我的行程、行程详情、登录注册、AI 监控台。
+- 对外叙事建议明确区分：
+  - AI 主规划链路：`/api/ai/tourism/stream`
+  - 行程沉淀：`/api/ai/trips/*`
+  - 照片资产：`/api/trips/{tripId}/photos*`
+  - 后台能力证明：`/api/ai/monitor/*` 与 `/api/ai/tasks/*`
 
 ## 维护者
 

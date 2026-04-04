@@ -6,11 +6,13 @@ import {
   health, queryMilvusCount, syncMilvusKnowledge,
   createKnowledgeIngestionTask, getAiTaskStatus
 } from '@/api/monitoringController'
+import { getHealthTone, getQueryCountValue, summarizeSyncResult, summarizeTaskStatus } from '@/utils/monitoring'
 
 // -------------- 1. Milvus 层数据 --------------
 const milvusLoading = ref(false)
 const healthData = ref<Record<string, any>>({})
 const queryResult = ref<Record<string, any>>({})
+const lastSyncResult = ref<Record<string, any> | null>(null)
 
 async function fetchMilvusData() {
   milvusLoading.value = true
@@ -67,9 +69,7 @@ const autoSyncing = ref(false)
 const TERMINAL_TASK_STATUS = new Set(['SUCCESS', 'FAILED', 'CANCELLED'])
 let pollingTimer: number | null = null
 
-const activeTaskCount = computed(
-  () => taskRecords.value.filter((task) => !['SUCCESS', 'FAILED', 'CANCELLED'].includes((task.status || '').toUpperCase())).length
-)
+const taskSummary = computed(() => summarizeTaskStatus(taskRecords.value))
 
 const summaryCards = computed<SummaryCard[]>(() => [
   {
@@ -78,11 +78,15 @@ const summaryCards = computed<SummaryCard[]>(() => [
   },
   {
     label: '知识库向量总数',
-    value: queryResult.value.statsRowCount ?? queryResult.value.queryCount ?? '0',
+    value: getQueryCountValue(queryResult.value),
   },
   {
     label: '未完结任务',
-    value: activeTaskCount.value,
+    value: taskSummary.value.activeCount,
+  },
+  {
+    label: '最近同步',
+    value: summarizeSyncResult(lastSyncResult.value).label,
   },
 ])
 
@@ -95,6 +99,9 @@ const columns = [
   { title: '入库同步', key: 'syncAction', width: 160 },
   { title: '动作', key: 'action', width: 160, align: 'center' }
 ]
+
+const syncSummary = computed(() => summarizeSyncResult(lastSyncResult.value))
+const healthTone = computed(() => getHealthTone(healthData.value))
 
 function loadRecordsFromLocal() {
   try {
@@ -160,7 +167,8 @@ async function triggerSyncAfterSuccess(record: TaskRecord) {
 
   autoSyncing.value = true
   try {
-    await syncMilvusKnowledge({ recreateCollection: false })
+    const response = await syncMilvusKnowledge({ recreateCollection: false })
+    lastSyncResult.value = response.data?.data || null
     message.success('已成功触发知识库入库同步')
     await fetchMilvusData()
   } catch (e) {
@@ -331,7 +339,7 @@ onBeforeUnmount(() => {
       <div>
         <p class="eyebrow">AI 监控中心</p>
         <h1>AI 调度与监控控制台</h1>
-        <p>监控概览、流水线调度、状态追踪都放在同一页内，尽量保持操作路径短。</p>
+        <p>这里作为答辩中的后台能力证明，只承接健康状态、知识库调度和任务追踪，不与用户主链路争主角。</p>
       </div>
 
       <div class="header-actions">
@@ -346,6 +354,21 @@ onBeforeUnmount(() => {
       <div v-for="card in summaryCards" :key="card.label" class="summary-card">
         <strong>{{ card.value }}</strong>
         <span>{{ card.label }}</span>
+      </div>
+    </section>
+
+    <section class="evidence-strip">
+      <div class="evidence-item">
+        <span class="evidence-label">服务状态</span>
+        <a-tag :color="healthTone">{{ healthData.status || '--' }}</a-tag>
+      </div>
+      <div class="evidence-item">
+        <span class="evidence-label">向量规模</span>
+        <span class="evidence-value">{{ getQueryCountValue(queryResult) }} 条</span>
+      </div>
+      <div class="evidence-item">
+        <span class="evidence-label">同步结果</span>
+        <span class="evidence-value">{{ syncSummary.detail }}</span>
       </div>
     </section>
 
@@ -515,7 +538,7 @@ onBeforeUnmount(() => {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -542,6 +565,34 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr);
   gap: 16px;
+}
+
+.evidence-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.evidence-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 28, 46, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.evidence-label {
+  color: var(--color-muted, #667085);
+  font-size: 13px;
+}
+
+.evidence-value {
+  color: var(--color-text, #0f1c2e);
+  font-weight: 600;
+  text-align: right;
 }
 
 .panel-card {
@@ -611,6 +662,10 @@ onBeforeUnmount(() => {
 
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .evidence-strip {
+    grid-template-columns: 1fr;
   }
 
   .form-grid {
