@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { getLatestFakeOrder, saveFakeOrder } from './productOrder'
+import { getLatestFakeOrder, getProductPriceLabel, saveFakeOrder } from './productOrder'
 
 describe('productOrder', () => {
   beforeEach(() => {
@@ -38,5 +38,15 @@ describe('productOrder', () => {
     expect(order?.amountLabel).toBe('￥99.00')
     expect(order?.status).toBe('paid')
     expect(order?.orderNo).toMatch(/^MOCK-/)
+  })
+
+  it('falls back to the default price when product id is not numeric', () => {
+    expect(getProductPriceLabel({ id: 'abc' })).toBe('￥99.00')
+  })
+
+  it('returns null when stored fake order is invalid json', () => {
+    localStorage.setItem('travel_mall_latest_fake_order', '{invalid-json')
+
+    expect(getLatestFakeOrder()).toBeNull()
   })
 })

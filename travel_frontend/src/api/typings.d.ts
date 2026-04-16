@@ -114,6 +114,7 @@ declare namespace API {
     startDate?: string
     endDate?: string
     dailyHighlights?: Record<string, any>
+    structuredData?: string
     status?: string
     createTime?: string
     updateTime?: string

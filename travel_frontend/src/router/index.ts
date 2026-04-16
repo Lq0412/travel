@@ -3,10 +3,13 @@ import HomePage from '@/pages/HomePage.vue'
 import WorkspacePage from '@/pages/workspace/WorkspacePage.vue'
 import TripsPage from '@/pages/trips/TripsPage.vue'
 import TripDetailPage from '@/pages/trips/TripDetailPage.vue'
-import AIAdminMonitorPage from '@/pages/ai/AIAdminMonitorPage.vue'
+import ForumPage from '@/pages/user/ForumPage.vue'
 import ProfilePage from '@/pages/user/ProfilePage.vue'
 import UserLoginPage from '@/pages/user/UserLoginPage.vue'
 import UserRegisterPage from '@/pages/user/UserRegisterPage.vue'
+import MallPage from '@/pages/mall/MallPage.vue'
+import ProductDetailPage from '@/pages/mall/ProductDetailPage.vue'
+import ProductPaymentSuccessPage from '@/pages/mall/ProductPaymentSuccessPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -36,19 +39,35 @@ const router = createRouter({
       meta: { layout: 'topnav' },
     },
     {
+      path: '/inspiration',
+      name: '灵感广场',
+      component: ForumPage,
+      meta: { layout: 'topnav' },
+    },
+    {
       path: '/profile',
       name: '我的',
       component: ProfilePage,
       meta: { layout: 'topnav' },
     },
-    {
-      path: '/admin/ai-monitor',
-      name: 'AI监控',
-      component: AIAdminMonitorPage,
+    {      path: '/mall',
+      name: '商城',
+      component: MallPage,
       meta: { layout: 'topnav' },
     },
     {
-      path: '/user/login',
+      path: '/products/:id',
+      name: '商品详情',
+      component: ProductDetailPage,
+      meta: { layout: 'topnav' },
+    },
+    {
+      path: '/products/:id/payment-success',
+      name: '支付成功',
+      component: ProductPaymentSuccessPage,
+      meta: { layout: 'topnav' },
+    },
+    {      path: '/user/login',
       name: '用户登录',
       component: UserLoginPage,
       meta: { layout: 'none' },
@@ -66,6 +85,23 @@ const router = createRouter({
     {
       path: '/user/helper',
       redirect: '/workspace',
+    },
+    {
+      path: '/admin/ai-monitor',
+      name: 'AI 监控',
+      component: () => import('@/pages/ai/AIAdminMonitorPage.vue'),
+      meta: { layout: 'topnav' },
+    },
+    {
+      path: '/user/forum',
+      redirect: '/inspiration',
+    },
+    {
+      path: '/trips/:id/memory',
+      redirect: (to) => ({
+        path: `/trips/${to.params.id}`,
+        query: { ...to.query, tab: 'memory' },
+      }),
     },
     {
       path: '/:pathMatch(.*)*',

@@ -14,6 +14,7 @@ import com.lq.travel.service.QuotaService;
 import com.lq.travel.callback.StreamCallback;
 import com.lq.travel.agent.impl.GenericTravelAgent;
 import com.lq.travel.annotation.AuthCheck;
+import com.lq.travel.model.entity.AIMessage;
 import com.lq.travel.model.entity.User;
 import com.lq.travel.model.enums.IntentType;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
@@ -30,7 +31,11 @@ import org.springframework.http.MediaType;
 
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import com.lq.travel.util.TravelConversationMemory;
 
 
 /**
@@ -142,7 +147,7 @@ public class AIController {
                         .data("请先登录"));
                 emitter.complete();
             } catch (IOException e) {
-                emitter.completeWithError(e);
+                emitter.complete();
             }
             return emitter;
         }
@@ -156,7 +161,7 @@ public class AIController {
                         .data("您的每日配额已用完，剩余: " + remaining + " tokens。明天0点自动恢复。"));
                 emitter.complete();
             } catch (IOException e) {
-                emitter.completeWithError(e);
+                emitter.complete();
             }
             return emitter;
         }
@@ -179,11 +184,36 @@ public class AIController {
                         .name("start")
                     .data("通用旅行助手开始为您规划行程..."));
 
+                String effectiveContext = context;
+                Map<String, Object> agentParameters = new HashMap<>();
+
+                if (conversationId != null) {
+                    try {
+                        List<AIMessage> conversationMessages = messageService.getConversationMessages(conversationId);
+                        TravelConversationMemory.MemorySnapshot memorySnapshot = TravelConversationMemory.analyze(conversationMessages);
+
+                        if (memorySnapshot.hasAnySignal()) {
+                            String memoryBlock = memorySnapshot.toPromptBlock();
+                            if (effectiveContext == null || effectiveContext.isBlank()) {
+                                effectiveContext = memoryBlock;
+                            } else {
+                                effectiveContext = effectiveContext.trim() + "\n\n" + memoryBlock;
+                            }
+
+                            agentParameters.put("conversationMemory", memoryBlock);
+                            agentParameters.put("conversationReady", memorySnapshot.isReadyForItinerary());
+                        }
+                    } catch (Exception e) {
+                        log.warn("提取会话记忆失败: conversationId={}", conversationId, e);
+                    }
+                }
+
                 AgentRequest agentRequest = AgentRequest.builder()
                         .task(task)
-                        .context(context)
+                        .context(effectiveContext)
                         .goal(goal)
                         .constraints(constraints)
+                        .parameters(agentParameters)
                         .maxSteps(AIModelConfig.MAX_STEPS_TOURISM)
                     .build();
             
@@ -210,14 +240,7 @@ public class AIController {
                 public void onComplete() {
                     try {
                             String finalResult = full.toString();
-                            
-                            // 保存AI消息并扣减配额
-                            if (conversationId != null) {
-                                long responseTime = System.currentTimeMillis() - startTime;
-                                messageService.saveAIMessage(conversationId, full.toString(), null, responseTime);
-                                log.info("已保存AI回复到对话: {}, 响应时间: {}ms", conversationId, responseTime);
-                            }
-                            
+
                             // 根据响应长度估算Token使用量并扣减配额
                             // 粗略估算：中文字符约1.5 tokens/字，英文约0.75 tokens/字
                             int estimatedTokens = (int) (full.length() * 1.5);
@@ -234,7 +257,7 @@ public class AIController {
                             log.info("通用旅行代理流式调用完成");
                     } catch (IOException e) {
                         log.error("发送完成事件失败", e);
-                        emitter.completeWithError(e);
+                        emitter.complete();
                     }
                 }
                 
@@ -250,10 +273,10 @@ public class AIController {
                         emitter.send(SseEmitter.event()
                                 .name("error")
                                     .data("AI服务错误: " + error.getMessage()));
-                        emitter.completeWithError(error);
+                        emitter.complete();
                     } catch (IOException e) {
                         log.error("发送错误事件失败", e);
-                        emitter.completeWithError(e);
+                        emitter.complete();
                     }
                 }
             });
@@ -267,10 +290,10 @@ public class AIController {
                     emitter.send(SseEmitter.event()
                             .name("error")
                             .data("系统错误: " + e.getMessage()));
-                    emitter.completeWithError(e);
+                    emitter.complete();
                 } catch (IOException ioException) {
                     log.error("发送错误事件失败", ioException);
-                    emitter.completeWithError(ioException);
+                    emitter.complete();
                 }
             }
         });

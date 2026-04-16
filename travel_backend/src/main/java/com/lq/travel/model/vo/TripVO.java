@@ -22,6 +22,7 @@ public class TripVO implements Serializable {
     private Date startDate;
     private Date endDate;
     private Map<Integer, List<String>> dailyHighlights;
+    private String structuredData;
     private String status;
     private Date createTime;
     private Date updateTime;

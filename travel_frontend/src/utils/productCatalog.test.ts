@@ -119,4 +119,59 @@ describe('productCatalog', () => {
       }),
     )
   })
+
+  it('returns null when product detail request fails logically', async () => {
+    const { fetchProductById } = await import('./productCatalog')
+
+    getProductByIdMock.mockResolvedValue({
+      data: {
+        code: 500,
+        message: 'not found',
+        data: null,
+      },
+    })
+
+    await expect(fetchProductById('404')).resolves.toBeNull()
+  })
+
+  it('fetches and normalizes a product detail response', async () => {
+    const { fetchProductById, getCachedProducts } = await import('./productCatalog')
+
+    getProductByIdMock.mockResolvedValue({
+      data: {
+        code: 0,
+        message: 'ok',
+        data: {
+          id: 8,
+          name: '潮州牛肉丸',
+          city: '潮州',
+          address: '潮州市湘桥区西马路',
+          latitude: 23.665,
+          longitude: 116.622,
+          tags: ['美食'],
+          description: '测试详情',
+          isRecommendable: 1,
+          isPurchasable: 0,
+          cover: 'https://example.com/chaozhou.jpg',
+        },
+      },
+    })
+
+    const product = await fetchProductById('8')
+
+    expect(product).toEqual({
+      id: '8',
+      name: '潮州牛肉丸',
+      city: '潮州',
+      address: '潮州市湘桥区西马路',
+      latitude: 23.665,
+      longitude: 116.622,
+      tags: ['美食'],
+      description: '测试详情',
+      isRecommendable: true,
+      isPurchasable: false,
+      cover: 'https://example.com/chaozhou.jpg',
+    })
+    expect(getCachedProducts()).toContainEqual(product)
+  })
 })

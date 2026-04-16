@@ -2,6 +2,8 @@ package com.lq.travel.service.impl;
 
 import com.lq.travel.model.dto.ai.AgentRequest;
 import com.lq.travel.model.enums.IntentType;
+import com.lq.travel.service.AmapService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -17,6 +19,9 @@ import java.util.regex.Pattern;
  */
 @Service
 public class TravelMultiAgentCoordinator {
+
+    @Autowired
+    private AmapService amapService;
 
     private static final Pattern DESTINATION_LABEL_PATTERN = Pattern.compile("(?:目的地|城市|地点)\\s*[:：]\\s*([\\p{IsHan}A-Za-z0-9·]{2,20})");
     private static final Pattern DESTINATION_VERB_PATTERN = Pattern.compile("(?:去|到|前往|想去|打算去)([\\p{IsHan}A-Za-z0-9·]{2,20})");
@@ -62,21 +67,15 @@ public class TravelMultiAgentCoordinator {
         }
 
         if (StringUtils.hasText(ragContext)) {
-            prompt.append(ragContext).append("\n\n");
+            prompt.append("【本地知识库信息】\n").append(ragContext).append("\n\n");
         }
 
-        if (StringUtils.hasText(request.getContext())) {
-            prompt.append("【上下文信息】\n").append(request.getContext()).append("\n\n");
-        }
-
-        prompt.append("【用户需求】\n").append(defaultText(request.getTask())).append("\n\n");
-
-        if (StringUtils.hasText(request.getGoal())) {
-            prompt.append("【目标】\n").append(request.getGoal()).append("\n\n");
-        }
-
-        if (StringUtils.hasText(request.getConstraints())) {
-            prompt.append("【约束条件】\n").append(request.getConstraints()).append("\n\n");
+        // 调用高德API获取实时天气数据
+        if (StringUtils.hasText(destinationHint)) {
+            String amapData = amapService.getWeatherInfo(destinationHint);
+            if (StringUtils.hasText(amapData)) {
+                prompt.append("【高德实时环境数据】\n").append(amapData).append("\n\n");
+            }
         }
 
         if (intent == IntentType.ITINERARY_GENERATION) {
@@ -118,6 +117,14 @@ public class TravelMultiAgentCoordinator {
             return "";
         }
         String normalized = raw.trim();
+        String[] suffixes = {"怎么玩", "怎么游", "旅游", "旅行", "游玩", "出游", "出行", "玩"};
+        for (String suffix : suffixes) {
+            if (normalized.endsWith(suffix) && normalized.length() > suffix.length()) {
+                normalized = normalized.substring(0, normalized.length() - suffix.length()).trim();
+                break;
+            }
+        }
+
         Set<String> stopWords = new LinkedHashSet<>();
         stopWords.add("旅游");
         stopWords.add("旅行");
@@ -139,3 +146,5 @@ public class TravelMultiAgentCoordinator {
         return StringUtils.hasText(text) ? text.trim() : "";
     }
 }
+
+

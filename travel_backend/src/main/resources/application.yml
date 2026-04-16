@@ -112,6 +112,10 @@ knife4j:
   setting:
     language: zh_CN  # 中文界面
 
+amap:
+  key: ${AMAP_KEY:your_amap_web_service_key}
+  weather-url: https://restapi.amap.com/v3/weather/weatherInfo
+
 pexels:
   base-url: https://api.pexels.com/v1
   cache-minutes: 30

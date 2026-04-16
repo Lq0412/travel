@@ -2,27 +2,49 @@
   <div class="workspace-page">
     <header class="page-header">
       <div class="header-actions">
-        <a-dropdown v-if="isLoggedIn && conversations.length > 0" placement="bottomRight" :trigger="['click']" :overlayStyle="{ maxHeight: '400px', overflowY: 'auto' }">
+        <a-dropdown
+          v-if="isLoggedIn && conversations.length > 0"
+          placement="bottomRight"
+          :trigger="['click']"
+          :overlayStyle="{ maxHeight: '400px', overflowY: 'auto' }"
+        >
           <a-button type="link" class="conv-trigger-btn">
-            {{ currentConversationTitle }} <DownOutlined style="font-size: 10px; margin-left: 4px;" />
+            {{ currentConversationTitle }}
+            <DownOutlined style="font-size: 10px; margin-left: 4px" />
           </a-button>
           <template #overlay>
-            <a-menu class="workspace-conv-menu" :selectedKeys="conversationId ? [conversationId] : []">
-              <a-menu-item key="new-conversation" @click="resetConversation" style="padding: 10px 16px;">
-                <strong style="color: #3b6edc;"><PlusOutlined style="margin-right: 4px;" /> 新会话</strong>
+            <a-menu
+              class="workspace-conv-menu"
+              :selectedKeys="conversationId ? [conversationId] : []"
+            >
+              <a-menu-item
+                key="new-conversation"
+                @click="resetConversation"
+                style="padding: 10px 16px"
+              >
+                <strong style="color: #3b6edc"
+                  ><PlusOutlined style="margin-right: 4px" /> 新会话</strong
+                >
               </a-menu-item>
               <a-menu-divider />
               <a-menu-item
                 v-for="conv in conversations"
                 :key="String(conv.id)"
                 @click="selectConversation(conv)"
-                style="padding: 10px 16px; min-width: 220px;"
+                style="padding: 10px 16px; min-width: 220px"
               >
-                <div class="conv-menu-item" style="display: flex; flex-direction: column; gap: 4px;">
-                  <div class="conv-title" :style="{ fontSize: '14px', color: String(conv.id) === conversationId ? '#3b6edc' : '#333', fontWeight: String(conv.id) === conversationId ? 600 : 400 }">
+                <div class="conv-menu-item" style="display: flex; flex-direction: column; gap: 4px">
+                  <div
+                    class="conv-title"
+                    :style="{
+                      fontSize: '14px',
+                      color: String(conv.id) === conversationId ? '#3b6edc' : '#333',
+                      fontWeight: String(conv.id) === conversationId ? 600 : 400,
+                    }"
+                  >
                     {{ summarizeConversation(conv).title }}
                   </div>
-                  <div class="conv-time" style="font-size: 12px; color: #999;">
+                  <div class="conv-time" style="font-size: 12px; color: #999">
                     {{ summarizeConversation(conv).timeLabel }}
                   </div>
                 </div>
@@ -50,7 +72,7 @@
     </header>
 
     <section v-if="isLoggedIn" class="planner-stage">
-      <div class="stage-content" :class="{ 'map-hidden': !mapVisible }">
+      <div class="stage-content" :class="{ 'map-hidden': !mapVisible }" v-show="currentItinerary">
         <div class="timeline-panel" :class="{ 'timeline-panel-full': !mapVisible }">
           <ItineraryTimelineBoard
             :itinerary="currentItinerary"
@@ -63,31 +85,58 @@
         </div>
       </div>
 
-      <div class="bottom-chat">
-        <div class="theme-selector-container">
-          <span class="theme-label">选择定制偏好：</span>
-          <a-radio-group v-model:value="selectedTheme" size="small" button-style="solid">
-            <a-radio-button value="none">常规路线</a-radio-button>
-            <a-radio-button value="elderly">👴 银发族适老游</a-radio-button>
-            <a-radio-button value="rural">🌾 乡村振兴非遗游</a-radio-button>
-            <a-radio-button value="student">🎒 大学生特种兵游</a-radio-button>
-          </a-radio-group>
-        </div>
-        <div class="quick-suggestions">
-          <button
-            v-for="suggestion in suggestionInputs"
-            :key="suggestion"
-            type="button"
-            class="suggestion-chip"
-            :disabled="isLoading"
-            @click="applySuggestion(suggestion)"
-          >
-            {{ suggestion }}
+      <div
+        class="chat-history-panel"
+        :class="{ 'is-collapsed': chatPanelCollapsed, 'is-center-mode': !currentItinerary }"
+        v-if="chatMessages.length > 0 || !currentItinerary"
+      >
+        <div class="chat-history-header" v-if="currentItinerary">
+          <span class="chat-history-title">对话记录</span>
+          <button type="button" class="chat-history-toggle" @click="chatPanelCollapsed = !chatPanelCollapsed">
+            {{ chatPanelCollapsed ? '展开' : '收起' }}
           </button>
         </div>
+        <div class="chat-history-list" v-show="!chatPanelCollapsed || !currentItinerary">
+          <div v-if="chatMessages.length === 0 && !currentItinerary" class="chat-welcome-message text-center py-6" style="margin-top: 40px; padding: 40px 0;">
+            <h3 style="font-size: 24px; font-weight: 600; color: #1e293b; margin-bottom: 12px; text-align: center;">你好！我是你的智能旅行规划师 👋</h3>
+            <p style="color: #64748b; font-size: 15px; margin: 0; text-align: center; line-height: 1.6;">告诉我你的出行想法，比如去哪里、和谁一起、行程大约几天？<br/>我将为你量身定制专属行程。</p>
+          </div>
+          <div
+            v-for="(item, index) in chatMessages"
+            :key="`${item.role}-${index}-${item.time.getTime()}`"
+            class="chat-message"
+            :class="[
+              item.role === 'user' ? 'is-user' : 'is-ai',
+              { 'has-recommendation-cards': Boolean(item.recommendationCards) },
+            ]"
+          >
+            <div class="chat-message-meta">
+              <span>{{ item.role === 'user' ? '我' : '旅行助手' }}</span>
+              <span>{{ formatChatTime(item.time) }}</span>
+            </div>
+            <div v-if="item.text" class="chat-message-text">
+              {{ getChatMessageDisplayText(item, index) }}
+            </div>
+            <ChatRecommendationCards
+              v-if="item.recommendationCards"
+              :title="item.recommendationCards.title"
+              :products="item.recommendationCards.products"
+              @purchase="handleProductPurchase"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-chat">
+        <RecentTripPromptCards
+          :trips="recentTrips"
+          :loading="recentTripsLoading"
+          :disabled="isLoading"
+          @select="handleRecentTripSelect"
+        />
         <ChatInput
           :disabled="isLoading"
-          placeholder="告诉我下一步想怎么改，例如：把第二天晚上的景点改成夜景路线"
+          placeholder="告诉我你的旅行计划，比如：成都 3 天美食游，预算 2000 元"
           @send-message="handleSendMessage"
         />
       </div>
@@ -97,9 +146,9 @@
       <div class="login-prompt">
         <img :src="illustrations.travelMode" alt="travel illustration" />
         <div class="prompt-content">
-          <h2>登录后开始动态规划</h2>
-          <p>你可以在底部持续输入需求，AI 会把你的想法实时同步到中间时间轴。</p>
-          <a-button type="primary" size="large" @click="goLogin">前往登录</a-button>
+          <h2>登录后开始规划行程</h2>
+          <p>告诉 AI 你想去哪、玩几天、预算多少，3 分钟生成专属旅行方案。</p>
+          <a-button type="primary" size="large" @click="goLogin">立即登录</a-button>
         </div>
       </div>
     </section>
@@ -108,12 +157,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import ChatInput from '@/pages/user/ChatInput.vue'
 import ItineraryTimelineBoard from '@/pages/workspace/ItineraryTimelineBoard.vue'
 import DynamicMap from '@/pages/workspace/DynamicMap.vue'
+import RecentTripPromptCards from '@/pages/workspace/components/RecentTripPromptCards.vue'
+import ChatRecommendationCards from '@/pages/workspace/components/ChatRecommendationCards.vue'
+import { getMyTrips, saveTrip } from '@/api/tripController'
 import type {
   Activity,
   DailyPlan,
@@ -125,15 +177,33 @@ import { useLoginUserStore } from '@/stores/useLoginUserStore'
 import { useWorkspaceConversations } from '@/composables/useWorkspaceConversations'
 import { useVisualContent } from '@/composables/useVisualContent'
 import { useChatStream } from '@/composables/useChatStream'
-import { saveTrip } from '@/api/tripController'
 import { getConversationMessagesById } from '@/api/chatConversationClient'
-import { extractStructuredData } from '@/utils/chatStreamParser'
-import { buildConversationTitle, summarizeConversation } from '@/utils/workspaceSession'
+import {
+  filterAIResponse,
+  removeStructuredDataMarkers,
+} from '@/utils/chatStreamParser'
+import {
+  buildChatMessageDisplayText,
+  buildConversationTitle,
+  type ChatLoadingStage,
+  restoreStructuredItineraryFromHistory,
+  summarizeConversation,
+} from '@/utils/workspaceSession'
+import { useRecentTripRecommendations } from '@/composables/useRecentTripRecommendations'
+import type { Product } from '@/types/product'
+import type { ChatRecommendationCards as ChatRecommendationCardsPayload } from '@/types/chat'
+import { attachRecommendationsToLatestAIMessage } from '@/utils/chatRecommendations'
+import {
+  buildRecentTripConversationLabel,
+  buildRecentTripRecommendationPrompt,
+} from '@/utils/recentTripPrompt'
+import { shouldRestoreRecentTripItinerary } from '@/utils/tripWorkflow'
 
 type DayPeriod = 'morning' | 'noon' | 'evening'
 type ActivityType = 'attraction' | 'transport' | 'rest' | 'meal'
 
 const router = useRouter()
+const route = useRoute()
 const loginUserStore = useLoginUserStore()
 const { illustrations, fetchFirst } = useVisualContent()
 
@@ -142,42 +212,60 @@ const conversationId = ref<string | undefined>(undefined)
 const currentConversationTitle = ref('新会话')
 const lastGeneratedAt = ref('')
 const isSavingTrip = ref(false)
-const selectedTheme = ref<string>('none')
 const enrichmentVersion = ref(0)
 const lastItinerarySignature = ref('')
 const itineraryDiff = ref<ItineraryDiffSummary | null>(null)
 const itineraryDiffRound = ref(0)
 const imageQueryCache = new Map<string, string>()
-const mapVisible = ref(true)
-const baseSuggestions = [
-  '给我一版 3 天游轻松路线，早中晚各 1 个景点',
-  '把第二天晚上改成夜景和夜市路线',
-  '整体预算控制到 2000 元以内',
-  '每一天午间安排室内景点，避开暴晒',
-]
+const structuredConversationCache = new Map<string, StructuredItinerary>()
+const mapVisible = ref(false)
+const chatPanelCollapsed = ref(false)
+const recentTrips = ref<API.TripVO[]>([])
+const recentTripsLoading = ref(false)
+const pendingRecommendationCards = ref<ChatRecommendationCardsPayload | null>(null)
 const ALLOWED_ACTIVITY_TYPES = new Set<ActivityType>(['attraction', 'transport', 'rest', 'meal'])
 
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
-const { isLoading, startStream, closeStream, structuredData, responseMeta } = useChatStream()
+const {
+  messages: chatMessages,
+  isLoading,
+  loadingStage,
+  startStream,
+  closeStream,
+  structuredData,
+  responseMeta,
+} = useChatStream()
 const {
   conversations,
   loading: conversationsLoading,
   refreshConversations,
   upsertConversation,
 } = useWorkspaceConversations(() => loginUserStore.loginUser.id)
-const suggestionInputs = computed(() => {
-  const destination = currentItinerary.value?.destination?.trim()
-  if (!destination) {
-    return baseSuggestions
+const {
+  recommendationTitle,
+  selectTrip: selectRecentTripRecommendation,
+  clearRecommendations,
+} = useRecentTripRecommendations()
+
+function getChatMessageDisplayText(item: { role: 'user' | 'ai'; text: string }, index: number) {
+  return buildChatMessageDisplayText(item, {
+    isLatest: index === chatMessages.value.length - 1,
+    isLoading: isLoading.value,
+    loadingStage: loadingStage.value as ChatLoadingStage,
+  })
+}
+
+function finalizePendingRecommendationCards() {
+  if (!pendingRecommendationCards.value) {
+    return
   }
 
-  return [
-    `把${destination}行程改成亲子友好版`,
-    `优化${destination}第二天，减少交通折返`,
-    `给${destination}补充更多拍照出片景点`,
-    `在${destination}每晚安排本地美食和夜游`,
-  ]
-})
+  chatMessages.value = attachRecommendationsToLatestAIMessage(
+    chatMessages.value,
+    pendingRecommendationCards.value,
+  )
+  pendingRecommendationCards.value = null
+}
 
 watch(structuredData, (data) => {
   if (!data) {
@@ -218,6 +306,9 @@ function applyStructuredItinerary(data: StructuredItinerary) {
   }
 
   currentItinerary.value = normalized
+  if (conversationId.value) {
+    structuredConversationCache.set(conversationId.value, normalized)
+  }
   lastGeneratedAt.value = new Date().toISOString()
 
   const currentVersion = ++enrichmentVersion.value
@@ -236,8 +327,52 @@ function goTrips() {
   router.push('/trips')
 }
 
+async function loadRecentTrips() {
+  if (!isLoggedIn.value) {
+    recentTrips.value = []
+    return
+  }
+
+  recentTripsLoading.value = true
+  try {
+    const response = await getMyTrips()
+    recentTrips.value = [...(response.data?.data || [])]
+      .sort((left, right) => {
+        const leftTime = new Date(left.updateTime || left.createTime || 0).getTime()
+        const rightTime = new Date(right.updateTime || right.createTime || 0).getTime()
+        return rightTime - leftTime
+      })
+      .slice(0, 3)
+  } catch (error) {
+    if (import.meta.env.DEV) {
+      console.warn('[WorkspacePage] 加载最近行程失败', error)
+    }
+  } finally {
+    recentTripsLoading.value = false
+  }
+}
+
 function toggleMapVisible() {
   mapVisible.value = !mapVisible.value
+}
+
+async function handleRecentTripSelect(trip: API.TripVO) {
+  resetConversation()
+
+  if (!shouldRestoreRecentTripItinerary('recommend-products')) {
+    currentItinerary.value = null
+  }
+
+  const products = await selectRecentTripRecommendation(trip)
+  pendingRecommendationCards.value = {
+    title: recommendationTitle.value,
+    trip,
+    products: [...products],
+  }
+
+  await handleSendMessage(await buildRecentTripRecommendationPrompt(trip, products), {
+    displayText: buildRecentTripConversationLabel(trip),
+  })
 }
 
 function resetConversation() {
@@ -250,6 +385,9 @@ function resetConversation() {
   itineraryDiff.value = null
   itineraryDiffRound.value = 0
   responseMeta.value = null
+  chatMessages.value = []
+  pendingRecommendationCards.value = null
+  clearRecommendations()
 }
 
 async function selectConversation(conversation: API.AIConversationVO) {
@@ -260,7 +398,7 @@ async function selectConversation(conversation: API.AIConversationVO) {
   conversationId.value = String(conversation.id)
   currentConversationTitle.value = conversation.title?.trim() || '新会话'
   lastGeneratedAt.value = conversation.updateTime || conversation.createTime || ''
-  
+
   // 清理当前状态，避免展示旧的行程卡片
   enrichmentVersion.value += 1
   lastItinerarySignature.value = ''
@@ -268,6 +406,9 @@ async function selectConversation(conversation: API.AIConversationVO) {
   itineraryDiff.value = null
   itineraryDiffRound.value = 0
   responseMeta.value = null
+  chatMessages.value = []
+  pendingRecommendationCards.value = null
+  clearRecommendations()
 
   try {
     const userId = loginUserStore.loginUser.id
@@ -275,32 +416,32 @@ async function selectConversation(conversation: API.AIConversationVO) {
 
     const resp = await getConversationMessagesById(conversation.id, userId)
     if (resp?.data?.code === 0 && resp.data.data) {
-      const messages = resp.data.data
-      // 从后往前找AI回复
-      const aiMsgs = messages.filter((msg: any) => msg.role === 'assistant' || msg.role === 'ai')
-      for (let i = aiMsgs.length - 1; i >= 0; i--) {
-        const aiMsg = aiMsgs[i]
-        if (aiMsg?.content) {
-          // 1. 尝试从流式标记中提取
-          const parsed = extractStructuredData(aiMsg.content)
-          if (parsed) {
-            applyStructuredItinerary(parsed)
-            message.success('已恢复会话行程上下文')
-            return
+      const historyMessages = resp.data.data
+      chatMessages.value = historyMessages
+        .filter((msg: any) => msg?.role === 'user' || msg?.role === 'assistant' || msg?.role === 'ai')
+        .map((msg: any) => {
+          const role = msg.role === 'user' ? 'user' : 'ai'
+          const rawContent = typeof msg.content === 'string' ? msg.content : ''
+          const cleanedContent =
+            role === 'ai'
+              ? filterAIResponse(rawContent) || removeStructuredDataMarkers(rawContent) || rawContent
+              : rawContent
+
+          return {
+            role,
+            text: cleanedContent,
+            time: msg.createTime ? new Date(msg.createTime) : new Date(),
           }
-          
-          // 2. 尝试直接作为 JSON 解析（兼容同步返回场景）
-          try {
-            const directJson = JSON.parse(aiMsg.content)
-            if (directJson && typeof directJson === 'object' && Array.isArray(directJson.dailyPlans)) {
-              applyStructuredItinerary(directJson)
-              message.success('已恢复会话行程上下文')
-              return
-            }
-          } catch {
-            // 解析失败忽略，继续找上一条消息
-          }
-        }
+        })
+
+      const restoredItinerary = restoreStructuredItineraryFromHistory(
+        historyMessages,
+        structuredConversationCache.get(conversationId.value) ?? null,
+      )
+      if (restoredItinerary) {
+        applyStructuredItinerary(restoredItinerary)
+        message.success('已恢复会话行程上下文')
+        return
       }
     }
   } catch (error) {
@@ -346,7 +487,12 @@ function normalizePeriod(raw: string): DayPeriod {
   if (value.includes('morning') || value.includes('早') || value.includes('上午')) {
     return 'morning'
   }
-  if (value.includes('noon') || value.includes('afternoon') || value.includes('中') || value.includes('午')) {
+  if (
+    value.includes('noon') ||
+    value.includes('afternoon') ||
+    value.includes('中') ||
+    value.includes('午')
+  ) {
     return 'noon'
   }
   if (value.includes('evening') || value.includes('night') || value.includes('晚')) {
@@ -424,7 +570,11 @@ function flattenDiffNodes(itinerary: StructuredItinerary): DiffNodeSnapshot[] {
   return nodes
 }
 
-function increaseDayStat(dayStats: Map<number, ItineraryDayDiffStat>, day: number, key: 'added' | 'removed' | 'updated') {
+function increaseDayStat(
+  dayStats: Map<number, ItineraryDayDiffStat>,
+  day: number,
+  key: 'added' | 'removed' | 'updated',
+) {
   const current = dayStats.get(day) || { day, added: 0, removed: 0, updated: 0 }
   current[key] += 1
   dayStats.set(day, current)
@@ -495,77 +645,92 @@ function normalizeIncomingItinerary(source: StructuredItinerary): StructuredItin
     const sourceActivities = ensureArray<Activity>(rawPlan.activities)
 
     plan.day = index + 1
-    const normalizedActivities: ActivityWithSourceIndex[] = sourceActivities.map((activity, activityIndex) => {
-      const raw = activity as unknown as {
-        imageUrl?: string
-        image?: string
-        picture?: string
-        address?: string
-      }
-      type RawLocation = {
-        address?: string
-        latitude?: number | string
-        longitude?: number | string
-        lat?: number | string
-        lng?: number | string
-        coordinates?: [number | string, number | string]
-      }
+    const normalizedActivities: ActivityWithSourceIndex[] = sourceActivities.map(
+      (activity, activityIndex) => {
+        const raw = activity as unknown as {
+          imageUrl?: string
+          image?: string
+          picture?: string
+          address?: string
+        }
+        type RawLocation = {
+          address?: string
+          latitude?: number | string
+          longitude?: number | string
+          lat?: number | string
+          lng?: number | string
+          coordinates?: [number | string, number | string]
+        }
 
-      const rawObj = activity as unknown as {
-        location?: RawLocation
-        latitude?: number | string
-        longitude?: number | string
-        lat?: number | string
-        lng?: number | string
-        'location.latitude'?: number | string
-        'location.longitude'?: number | string
-      }
+        const rawObj = activity as unknown as {
+          location?: RawLocation
+          latitude?: number | string
+          longitude?: number | string
+          lat?: number | string
+          lng?: number | string
+          'location.latitude'?: number | string
+          'location.longitude'?: number | string
+        }
 
-      const fallbackImage = [raw.imageUrl, raw.image, raw.picture].find(
-        (value): value is string => typeof value === 'string' && value.trim().length > 0,
-      )
-      const candidateImage = activity.imageUrl || fallbackImage || ''
-      const fallbackAddress = typeof raw.address === 'string' ? raw.address.trim() : ''
-      const locationAddress =
-        activity.location?.address?.trim() ||
-        rawObj.location?.address?.trim() ||
-        fallbackAddress ||
-        activity.name?.trim() ||
-        ''
+        const fallbackImage = [raw.imageUrl, raw.image, raw.picture].find(
+          (value): value is string => typeof value === 'string' && value.trim().length > 0,
+        )
+        const candidateImage = activity.imageUrl || fallbackImage || ''
+        const fallbackAddress = typeof raw.address === 'string' ? raw.address.trim() : ''
+        const locationAddress =
+          activity.location?.address?.trim() ||
+          rawObj.location?.address?.trim() ||
+          fallbackAddress ||
+          activity.name?.trim() ||
+          ''
 
-      let lat = rawObj.location?.latitude ?? rawObj.location?.lat ?? rawObj.latitude ?? rawObj['location.latitude'] ?? rawObj.lat
-      let lon = rawObj.location?.longitude ?? rawObj.location?.lng ?? rawObj.longitude ?? rawObj['location.longitude'] ?? rawObj.lng
+        let lat =
+          rawObj.location?.latitude ??
+          rawObj.location?.lat ??
+          rawObj.latitude ??
+          rawObj['location.latitude'] ??
+          rawObj.lat
+        let lon =
+          rawObj.location?.longitude ??
+          rawObj.location?.lng ??
+          rawObj.longitude ??
+          rawObj['location.longitude'] ??
+          rawObj.lng
 
-      if ((lat === undefined || lon === undefined) && Array.isArray(rawObj.location?.coordinates)) {
-        lon = rawObj.location.coordinates[0]
-        lat = rawObj.location.coordinates[1]
-      }
+        if (
+          (lat === undefined || lon === undefined) &&
+          Array.isArray(rawObj.location?.coordinates)
+        ) {
+          lon = rawObj.location.coordinates[0]
+          lat = rawObj.location.coordinates[1]
+        }
 
-      const normalizedLocation: Activity['location'] = {
-        address: locationAddress,
-      }
+        const normalizedLocation: Activity['location'] = {
+          address: locationAddress,
+        }
 
-      const latNum = Number(lat)
-      const lonNum = Number(lon)
-      if (Number.isFinite(latNum) && Number.isFinite(lonNum)) {
-        normalizedLocation.latitude = latNum
-        normalizedLocation.longitude = lonNum
-        normalizedLocation.coordinates = [lonNum, latNum]
-      }
+        const latNum = Number(lat)
+        const lonNum = Number(lon)
+        if (Number.isFinite(latNum) && Number.isFinite(lonNum)) {
+          normalizedLocation.latitude = latNum
+          normalizedLocation.longitude = lonNum
+          normalizedLocation.coordinates = [lonNum, latNum]
+        }
 
-      const period = normalizePeriod(activity.time)
-      return {
-        ...activity,
-        __sourceIndex: activityIndex,
-        time: period,
-        name: activity.name || '',
-        description: activity.description || '',
-        type: normalizeActivityType(activity.type),
-        imageUrl: isUsableImageUrl(candidateImage) ? candidateImage : '',
-        location: normalizedLocation,
-        estimatedCost: Number(activity.estimatedCost || 0),
-      }
-    })
+        const period = normalizePeriod(activity.time)
+        return {
+          ...activity,
+          __sourceIndex: activityIndex,
+          time: period,
+          name: activity.name || '',
+          description: activity.description || '',
+          type: normalizeActivityType(activity.type),
+          imageUrl: isUsableImageUrl(candidateImage) ? candidateImage : '',
+          location: normalizedLocation,
+          estimatedCost: Number(activity.estimatedCost || 0),
+        }
+      },
+    )
     plan.activities = normalizedActivities
       .sort((a, b) => {
         const periodDiff = periodWeight(a.time as DayPeriod) - periodWeight(b.time as DayPeriod)
@@ -710,6 +875,7 @@ async function saveCurrentItinerary() {
       throw new Error(response.data.message || '保存失败')
     }
 
+    void loadRecentTrips()
     message.success('行程已保存，正在跳转详情')
     router.push(`/trips/${response.data.data}`)
   } catch (error: unknown) {
@@ -720,31 +886,16 @@ async function saveCurrentItinerary() {
   }
 }
 
-function buildPlannerPrompt(userInput: string): string {
-  let themeInstruction = ''
-  if (selectedTheme.value === 'elderly') {
-    themeInstruction = '【偏好要求：银发族适老游】必须安排慢节奏的行程，减少步行和高负荷运动，优先安排自然风光和人文历史景点，且关注周边餐饮和休息区的便利性。'
-  } else if (selectedTheme.value === 'rural') {
-    themeInstruction = '【偏好要求：乡村振兴非遗游】必须带有社会价值导向，重点安排当地乡村生态旅游、非物质文化遗产体验、助农项目和小众冷门特色乡村点位。'
-  } else if (selectedTheme.value === 'student') {
-    themeInstruction = '【偏好要求：大学生特种兵打卡游】必须是高性价比、高密度的行程。包含网红打卡点、高性价比夜市和小吃街，不强制高品质酒店，主打一个高效低预算游玩。'
-  }
-
-const baseConstraint = '【输出要求】请输出可保存的结构化行程 JSON，字段必须包含 destination、days、budget、theme、dailyPlans、totalEstimatedCost、tips。\n【重要规划原则：酒店与顺路】行程必须基于真实的地理位置和交通可达性，遵循“就近顺路”的动线规划，严禁跨区折返跑。最好结合目的地合理安排默认酒店（标注为住宿/休息类型），每天早出晚归形成清晰的路径闭环（即使未指定具体的名称也需要占位）。\ndailyPlans.activities 中每个景点必须包含：time（morning/noon/evening）、name、description、type、location（必须包含 address，地址要尽量具体到景区/街道/商圈；longitude、latitude 为可选字段，如提供请使用标准WGS84小数经纬度）、estimatedCost、imageUrl。'
-
-  return `${userInput}\n\n${themeInstruction ? themeInstruction + '\n\n' : ''}${baseConstraint}`
-}
-
-async function handleSendMessage(text: string) {
+async function handleSendMessage(text: string, options?: { displayText?: string }) {
   const prompt = text.trim()
   if (!prompt) {
     return
   }
 
-  const optimisticTitle = buildConversationTitle(prompt)
-  const enhancedTask = buildPlannerPrompt(prompt)
+  const displayText = options?.displayText?.trim() || prompt
+  const optimisticTitle = buildConversationTitle(displayText)
   await startStream(
-    enhancedTask,
+    prompt,
     conversationId.value,
     () => {},
     (newConversationId: string) => {
@@ -763,12 +914,18 @@ async function handleSendMessage(text: string) {
       applyStructuredItinerary(data)
       void refreshConversations()
     },
-    prompt
+    displayText,
   )
 }
 
-function applySuggestion(suggestion: string) {
-  void handleSendMessage(suggestion)
+function handleProductPurchase(product: Product) {
+  router.push(`/products/${product.id}`)
+}
+
+function formatChatTime(time: Date): string {
+  const hour = String(time.getHours()).padStart(2, '0')
+  const minute = String(time.getMinutes()).padStart(2, '0')
+  return `${hour}:${minute}`
 }
 
 onUnmounted(() => {
@@ -776,16 +933,30 @@ onUnmounted(() => {
 })
 
 watch(
+  isLoading,
+  (loading, wasLoading) => {
+    if (!loading && wasLoading) {
+      finalizePendingRecommendationCards()
+    }
+  },
+)
+
+watch(
   isLoggedIn,
   (loggedIn) => {
     if (loggedIn) {
       void refreshConversations()
+      void loadRecentTrips()
       return
     }
 
     conversationId.value = undefined
     currentConversationTitle.value = '新会话'
     lastGeneratedAt.value = ''
+    chatMessages.value = []
+    recentTrips.value = []
+    pendingRecommendationCards.value = null
+    clearRecommendations()
   },
   { immediate: true },
 )
@@ -802,8 +973,10 @@ watch(
       return
     }
 
-    currentConversationTitle.value = currentConversation.title?.trim() || currentConversationTitle.value
-    lastGeneratedAt.value = currentConversation.updateTime || currentConversation.createTime || lastGeneratedAt.value
+    currentConversationTitle.value =
+      currentConversation.title?.trim() || currentConversationTitle.value
+    lastGeneratedAt.value =
+      currentConversation.updateTime || currentConversation.createTime || lastGeneratedAt.value
   },
   { deep: true },
 )
@@ -811,6 +984,13 @@ watch(
 onMounted(() => {
   if (isLoggedIn.value) {
     void refreshConversations()
+    void loadRecentTrips()
+    
+    const initialPrompt = route.query.prompt as string
+    if (initialPrompt && !isLoading.value) {
+      void handleSendMessage(initialPrompt)
+      router.replace({ ...route, query: {} })
+    }
   }
 })
 </script>
@@ -843,6 +1023,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 
 .stage-content {
@@ -887,6 +1068,128 @@ onMounted(() => {
   box-shadow: none; /* 移除外层阴影 */
 }
 
+.chat-history-panel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: min(600px, calc(100% - 20px));
+  border: 1px solid rgba(15, 28, 46, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+  z-index: 12;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+}
+
+.chat-history-panel.is-center-mode {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  transform: none;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.chat-history-panel.is-center-mode .chat-history-list {
+  flex: 1;
+  max-height: none;
+  padding: 20px 4px 60px;
+}
+.chat-history-panel.is-collapsed {
+  width: auto;
+}
+
+.chat-history-panel.is-center-mode.is-collapsed {
+  top: 10px;
+  right: 10px;
+  left: auto;
+  transform: none;
+}
+
+.chat-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.chat-history-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.chat-history-toggle {
+  border: 1px solid rgba(30, 64, 175, 0.25);
+  background: rgba(30, 64, 175, 0.08);
+  color: #1e40af;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.chat-history-list {
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 90%;
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+.chat-message.is-user {
+  align-self: flex-end;
+  background: rgba(19, 96, 255, 0.12);
+  border: 1px solid rgba(19, 96, 255, 0.2);
+}
+
+.chat-message.is-ai {
+  align-self: flex-start;
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.chat-message.has-recommendation-cards {
+  max-width: 100%;
+  width: 100%;
+}
+
+.chat-message-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.chat-message-text {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-size: 14px;
+  color: #0f172a;
+}
+
 .bottom-chat {
   position: relative;
   z-index: 8;
@@ -895,49 +1198,6 @@ onMounted(() => {
   border-top: 1px solid rgba(15, 28, 46, 0.08);
   background: linear-gradient(180deg, rgba(244, 247, 251, 0.3), rgba(244, 247, 251, 0.98));
   backdrop-filter: blur(8px);
-}
-
-.theme-selector-container {
-  display: flex;
-  margin: 0 auto 8px;
-  max-width: 960px;
-  align-items: center;
-}
-
-.theme-label {
-  font-size: 13px;
-  color: var(--color-text-secondary, #666);
-  margin-right: 8px;
-  font-weight: 500;
-}
-
-.quick-suggestions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 0 auto 6px;
-  max-width: 960px;
-}
-
-.suggestion-chip {
-  min-height: 30px;
-  border-radius: 999px;
-  border: 1px solid rgba(19, 96, 255, 0.26);
-  background: rgba(19, 96, 255, 0.08);
-  color: #1b4bc4;
-  padding: 0 12px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.suggestion-chip:hover:not(:disabled) {
-  background: rgba(19, 96, 255, 0.14);
-  border-color: rgba(19, 96, 255, 0.42);
-}
-
-.suggestion-chip:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .bottom-chat :deep(.chat-input) {
@@ -969,6 +1229,16 @@ onMounted(() => {
 }
 
 @media (max-width: 760px) {
+  .chat-history-panel {
+    top: 8px;
+    right: 8px;
+    width: calc(100% - 16px);
+  }
+
+  .chat-history-list {
+    max-height: 42vh;
+  }
+
   .stage-content {
     flex-direction: column;
   }

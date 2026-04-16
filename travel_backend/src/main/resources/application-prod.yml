@@ -1,0 +1,72 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/travel?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:travel}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
+      database: 0
+      timeout: 2592000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+  ai:
+    dashscope:
+      api-key: ${SPRING_AI_DASHSCOPE_API_KEY:}
+      chat:
+        options:
+          model: ${DASHSCOPE_CHAT_MODEL:tongyi-xiaomi-analysis-pro}
+          temperature: ${DASHSCOPE_CHAT_TEMPERATURE:0.7}
+          max-tokens: ${DASHSCOPE_CHAT_MAX_TOKENS:2000}
+          timeout: ${DASHSCOPE_CHAT_TIMEOUT:300}
+          max-retries: ${DASHSCOPE_CHAT_MAX_RETRIES:3}
+      embedding:
+        options:
+          model: ${DASHSCOPE_EMBEDDING_MODEL:multimodal-embedding-v1}
+      image:
+        options:
+          model: ${DASHSCOPE_IMAGE_MODEL:qwen-image-max}
+
+ai:
+  default:
+    provider: dashscope
+  search:
+    tavily:
+      api-key: ${AI_SEARCH_TAVILY_API_KEY:${TAVILY_API_KEY:}}
+  rag:
+    enabled: true
+    milvus:
+      enabled: true
+      endpoint: ${MILVUS_ENDPOINT:http://milvus:19530}
+      token: ${MILVUS_TOKEN:}
+      database: ${MILVUS_DATABASE:default}
+      collection: ${MILVUS_COLLECTION:travel_knowledge}
+      vector-field: ${MILVUS_VECTOR_FIELD:embedding}
+      primary-field: ${MILVUS_PRIMARY_FIELD:id}
+      auto-init-collection: true
+      auto-sync-on-startup: false
+
+knife4j:
+  enable: false
+  production: true
+
+cos:
+  client:
+    host: ${COS_CLIENT_HOST:}
+    region: ${COS_CLIENT_REGION:}
+    bucket: ${COS_CLIENT_BUCKET:}
+    secretId: ${COS_CLIENT_SECRETID:}
+    secretKey: ${COS_CLIENT_SECRETKEY:}
+
+pexels:
+  api-key: ${PEXELS_API_KEY:}
+
+amap:
+  key: ${AMAP_KEY:}

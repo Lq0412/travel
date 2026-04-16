@@ -1,5 +1,30 @@
 <template>
   <div class="timeline-board">
+    <!-- 行程总览与前置建议卡片 -->
+    <div v-if="itinerary && (itinerary.weatherOverview || itinerary.transportationOverview || itinerary.accommodationOverview)" class="itinerary-overview-cards">
+      <div class="overview-card" v-if="itinerary.weatherOverview">
+        <span class="card-icon">🌤️</span>
+        <div class="card-text">
+          <label>天气与穿搭</label>
+          <p>{{ itinerary.weatherOverview }}</p>
+        </div>
+      </div>
+      <div class="overview-card" v-if="itinerary.transportationOverview">
+        <span class="card-icon">🚇</span>
+        <div class="card-text">
+          <label>交通建议</label>
+          <p>{{ itinerary.transportationOverview }}</p>
+        </div>
+      </div>
+      <div class="overview-card" v-if="itinerary.accommodationOverview">
+        <span class="card-icon">🏨</span>
+        <div class="card-text">
+          <label>住宿指南</label>
+          <p>{{ itinerary.accommodationOverview }}</p>
+        </div>
+      </div>
+    </div>
+
     <!-- 移除了外层的 main-axis fixed-track -->
 
     <div v-if="timelineNodes.length" class="timeline-shell">
@@ -13,6 +38,9 @@
             <!-- 天数分隔标记，直接坐在主轴上 -->
             <div v-if="isFirstOfDay(index)" class="day-divider">
               <div class="day-badge" :class="{ 'is-changed': dayHasChanged(spot.day) }">第 {{ spot.day }} 天</div>
+              <div class="day-transport-advice" v-if="getTransportAdvice(spot.day)">
+                🚗 {{ getTransportAdvice(spot.day) }}
+              </div>
             </div>
 
             <!-- 时间轴重点节点 -->
@@ -183,6 +211,12 @@ function dayHasChanged(day: number): boolean {
   return Boolean(props.diff?.changedDays.includes(day))
 }
 
+function getTransportAdvice(day: number): string {
+  const plans = ensureArray<DailyPlan>(props.itinerary?.dailyPlans)
+  const plan = plans.find(p => p.day === day)
+  return plan?.transportAdvice || ''
+}
+
 const timelineNodes = computed<TimelineNode[]>(() => {
   const plans = ensureArray<DailyPlan>(props.itinerary?.dailyPlans)
   const nodes: TimelineNode[] = []
@@ -257,6 +291,47 @@ function toggleMetaDropdown() {
   box-sizing: border-box;
   position: relative;
   overflow: hidden; /* 保证两侧内容滑出范围时被安全裁切，不再越界 */
+}
+
+.itinerary-overview-cards {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  padding: 16px;
+  background-color: #f8fafc;
+  flex-wrap: wrap;
+}
+
+.overview-card {
+  flex: 1;
+  min-width: 200px;
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.overview-card .card-icon {
+  font-size: 24px;
+}
+
+.overview-card .card-text label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.overview-card .card-text p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+  white-space: pre-wrap;
 }
 
 .meta-dropdown {
@@ -387,11 +462,13 @@ function toggleMetaDropdown() {
 
 /* 天数提示 */
 .day-divider {
-  width: 140px;
+  width: 180px;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   z-index: 5;
+  gap: 12px;
 }
 
 .day-badge {
@@ -405,6 +482,17 @@ function toggleMetaDropdown() {
   position: relative;
   white-space: nowrap;
   letter-spacing: 1px;
+}
+
+.day-transport-advice {
+  font-size: 12px;
+  color: #475569;
+  background: white;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px dashed #cbd5e1;
+  text-align: center;
+  max-width: 140px;
 }
 
 .day-badge.is-changed {

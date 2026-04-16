@@ -39,7 +39,7 @@ public class ResponseUtils {
     public static <T> ResponseDTO<T> success(String message, T data) {
         return ResponseDTO.<T>builder()
                 .code(0)
-                .message("success")
+                .message(message)
                 .data(data)
                 .timestamp(System.currentTimeMillis())
                 .build();

@@ -14,8 +14,10 @@ import com.lq.travel.service.impl.TravelMultiAgentCoordinator;
 import com.lq.travel.util.IntentAnalyzer;
 import com.lq.travel.util.TravelIntentPromptFactory;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * 通用旅行智能助手
@@ -25,6 +27,9 @@ import java.util.List;
 public class GenericTravelAgent extends BaseAgent {
 
     private static final String ERROR_ACTION = "error";
+    private static final Pattern TRAVEL_FOLLOW_UP_PATTERN = Pattern.compile(
+            "(\\d+\\s*天|[一二三四五六七八九十两]+\\s*天|几天|预算|两三百|两百|三百|元|块|民宿|酒店|住宿|市区|市中心|景区附近|附近|位置|打车|地铁|公交|自驾|包车|高铁|飞机|明天|后天|周末|行程|规划|旅游|旅行|景点|路线|出行|出发|美食|拍照|打卡|夜景|夜市|餐厅|天气|穿搭)"
+    );
     private final TravelRagService travelRagService;
     private final TravelMultiAgentCoordinator multiAgentCoordinator;
 
@@ -52,7 +57,7 @@ public class GenericTravelAgent extends BaseAgent {
      */
     public void executeStreamWithIntent(AgentRequest request, Long conversationId, StreamCallback callback) {
         try {
-            IntentType intent = IntentAnalyzer.analyze(request.getTask());
+            IntentType intent = resolveIntent(request);
             log.info("通用旅行代理意图识别: {} - {}", intent, intent.getDescription());
 
             String systemPrompt = getSystemPromptByIntent(intent);
@@ -60,9 +65,12 @@ public class GenericTravelAgent extends BaseAgent {
             String ragContext = travelRagService.buildRagContext(request.getTask(), destinationHint, intent);
             String enhancedPrompt = multiAgentCoordinator.buildCoordinatedPrompt(request, intent, ragContext, destinationHint);
 
+            // 把所有的规则和 RAG 上下文拼接到系统提示词中，保持 message 为纯净的用户输入
+            String combinedSystemPrompt = systemPrompt + "\n\n" + enhancedPrompt;
+
             AIRequest aiRequest = AIRequest.builder()
-                    .message(enhancedPrompt)
-                    .systemPrompt(systemPrompt)
+                    .message(StringUtils.hasText(request.getTask()) ? request.getTask() : "你好")
+                    .systemPrompt(combinedSystemPrompt)
                     .temperature(0.7)
                     .maxTokens(2000)
                     .stream(true)
@@ -71,7 +79,7 @@ public class GenericTravelAgent extends BaseAgent {
             EnhancedStreamCallbackAdapter adapter = new EnhancedStreamCallbackAdapter(callback, intent);
 
             if (conversationId != null) {
-                aiService.chatStream(aiRequest, conversationId, adapter);
+                aiService.chatStream(aiRequest, conversationId, adapter);     
             } else {
                 aiService.chatStream(aiRequest, adapter);
             }
@@ -86,18 +94,21 @@ public class GenericTravelAgent extends BaseAgent {
         try {
             String destinationHint = multiAgentCoordinator.inferDestinationHint(request);
             String ragContext = travelRagService.buildRagContext(request.getTask(), destinationHint, IntentType.GENERAL_CHAT);
+            String enhancedPrompt = multiAgentCoordinator.buildCoordinatedPrompt(
+                request,
+                IntentType.GENERAL_CHAT,
+                ragContext,
+                destinationHint
+            );
+            
+            String combinedSystemPrompt = getSystemPrompt() + "\n\n" + enhancedPrompt;
 
             AIRequest aiRequest = AIRequest.builder()
-                .message(multiAgentCoordinator.buildCoordinatedPrompt(
-                    request,
-                    IntentType.GENERAL_CHAT,
-                    ragContext,
-                    destinationHint
-                ))
-                    .systemPrompt(getSystemPrompt())
-                    .temperature(0.6)
-                    .maxTokens(1200)
-                    .build();
+                .message(StringUtils.hasText(request.getTask()) ? request.getTask() : "你好")
+                .systemPrompt(combinedSystemPrompt)
+                .temperature(0.6)
+                .maxTokens(1200)
+                .build();
 
             AIResponse response = aiService.chat(aiRequest);
             if (!response.getSuccess()) {
@@ -145,5 +156,39 @@ public class GenericTravelAgent extends BaseAgent {
 
     private String getSystemPromptByIntent(IntentType intent) {
         return TravelIntentPromptFactory.byIntent(intent);
+    }
+
+    private IntentType resolveIntent(AgentRequest request) {
+        IntentType intent = IntentAnalyzer.analyze(request.getTask());
+        if (intent != IntentType.GENERAL_CHAT) {
+            return intent;
+        }
+
+        if (isConversationReady(request) && isTravelFollowUp(request.getTask())) {
+            log.info("会话记忆已满足行程生成条件，自动升级为行程规划意图: {}", request.getTask());
+            return IntentType.ITINERARY_GENERATION;
+        }
+
+        return intent;
+    }
+
+    private boolean isConversationReady(AgentRequest request) {
+        if (request == null || request.getParameters() == null) {
+            return false;
+        }
+
+        Object ready = request.getParameters().get("conversationReady");
+        if (ready instanceof Boolean booleanReady) {
+            return booleanReady;
+        }
+
+        return ready != null && Boolean.parseBoolean(String.valueOf(ready));
+    }
+
+    private boolean isTravelFollowUp(String task) {
+        if (!StringUtils.hasText(task)) {
+            return false;
+        }
+        return TRAVEL_FOLLOW_UP_PATTERN.matcher(task).find();
     }
 }

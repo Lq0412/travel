@@ -1,6 +1,7 @@
 package com.lq.travel.service.impl;
 
 import com.lq.travel.provider.AIProvider;
+import com.lq.travel.callback.EnhancedStreamCallbackAdapter;
 import com.lq.travel.callback.StreamCallback;
 import com.lq.travel.model.dto.ai.AIRequest;
 import com.lq.travel.model.dto.ai.AIResponse;
@@ -219,8 +220,15 @@ public class AIServiceImpl implements AIService {
 
             @Override
             public void onComplete() {
-                // 缓存最终结果
+                callback.onComplete();
+
                 String fullResponse = contentBuilder.toString();
+                if (callback instanceof EnhancedStreamCallbackAdapter enhancedCallback) {
+                    String enhancedResponse = enhancedCallback.getFullResponse();
+                    if (enhancedResponse != null && !enhancedResponse.isBlank()) {
+                        fullResponse = enhancedResponse;
+                    }
+                }
 
                 // 获取模型和提供商信息
                 String model = request.getModel() != null ? request.getModel() : provider.getDefaultModel();
@@ -239,7 +247,6 @@ public class AIServiceImpl implements AIService {
                     messageService.saveAIMessage(conversationId, fullResponse,
                             null, responseTime);
                 }
-                callback.onComplete();
             }
 
             @Override

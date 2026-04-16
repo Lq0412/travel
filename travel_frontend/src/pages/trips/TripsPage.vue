@@ -2,44 +2,20 @@
   <div class="trips-page">
     <section class="page-header">
       <div>
-        <p class="eyebrow">我的行程</p>
-        <h1>行程库只保留旅程推进所需的信息。</h1>
-        <p>支持按状态、是否已发布筛选，并默认按最近修改排序。</p>
+        <h1>My Trips</h1>
       </div>
-      <a-button type="primary" size="large" @click="goWorkspace">新建行程</a-button>
-    </section>
-
-    <section class="summary-grid">
-      <div class="summary-card">
-        <strong>{{ trips.length }}</strong>
-        <span>全部行程</span>
+      <div class="search-wrap">
+        <a-input
+          v-model:value="keyword"
+          allow-clear
+          class="search-input custom-search-input"
+          placeholder="Search trips..."
+        >
+          <template #suffix>
+            <search-outlined style="color: rgba(0,0,0,.45)" />
+          </template>
+        </a-input>
       </div>
-      <div class="summary-card">
-        <strong>{{ plannedCount }}</strong>
-        <span>待出行</span>
-      </div>
-      <div class="summary-card">
-        <strong>{{ publishedCount }}</strong>
-        <span>已发布到灵感广场</span>
-      </div>
-    </section>
-
-    <section class="filter-bar">
-      <a-input
-        v-model:value="keyword"
-        allow-clear
-        placeholder="搜索目的地或主题"
-        class="search-input"
-      />
-      <a-select v-model:value="statusFilter" class="filter-item">
-        <a-select-option value="all">全部状态</a-select-option>
-        <a-select-option value="planned">待出行</a-select-option>
-        <a-select-option value="completed">已完成</a-select-option>
-      </a-select>
-      <a-select v-model:value="assetFilter" class="filter-item">
-        <a-select-option value="all">全部资产</a-select-option>
-        <a-select-option value="published">已发布</a-select-option>
-      </a-select>
     </section>
 
     <section v-if="filteredTrips.length" class="trip-grid">
@@ -50,35 +26,37 @@
         class="trip-card"
         @click="openTrip(trip.id)"
       >
-        <div class="trip-top">
-          <div>
-            <h2>{{ trip.destination || '未命名行程' }}</h2>
-            <p>{{ trip.days || 0 }} 天 · {{ trip.theme || '通用主题' }}</p>
+        <div class="card-cover">
+          <img v-if="trip.id && coverMap[trip.id]" :src="coverMap[trip.id]" alt="cover" />
+          <div v-else class="cover-placeholder"></div>
+          
+          <div class="status-badge" :class="normalizeTripStatus(trip.status)">
+            <span class="status-icon"></span>
+            {{ normalizeTripStatus(trip.status) === 'planned' ? 'Ongoing' : 'Draft' }}
           </div>
-          <a-tag :color="getTripStatusTone(trip.status)">
-            {{ getTripStatusLabel(trip.status) }}
-          </a-tag>
         </div>
 
-        <div class="trip-meta">
-          <span>更新时间：{{ formatWorkflowDateTime(trip.updateTime || trip.createTime) }}</span>
-          <span>{{ trip.startDate ? `出发：${formatWorkflowDate(trip.startDate)}` : '出发时间待定' }}</span>
-        </div>
+        <div class="card-body">
+          <div class="trip-top">
+            <h2 class="trip-title">{{ trip.destination || '未命名行程' }}</h2>
+            <div class="action-btn" :class="normalizeTripStatus(trip.status)">
+              {{ normalizeTripStatus(trip.status) === 'planned' ? 'Ongoing' : 'Draft' }}
+            </div>
+          </div>
 
-        <div v-if="highlightPreview(trip).length" class="highlights">
-          <span v-for="item in highlightPreview(trip)" :key="item" class="highlight-pill">
-            {{ item }}
-          </span>
-        </div>
-
-        <div class="trip-foot">
-          <span>{{ isTripPublished(trip) ? '已发布' : '未发布' }}</span>
-          <span>{{ trip.photos?.length || 0 }} 张照片</span>
+          <div class="trip-meta">
+            <span class="meta-date">Date: {{ trip.startDate ? formatWorkflowDate(trip.startDate) : 'TBD' }}</span>
+            <span class="meta-separator"></span>
+            <span class="meta-location">
+              <environment-outlined /> 
+              {{ trip.days || 0 }} Days
+            </span>
+          </div>
         </div>
       </button>
     </section>
 
-    <a-empty v-else description="没有符合条件的行程，先去规划行程生成第一版方案" />
+    <a-empty v-else description="还没有行程，点击右上角'规划新行程'开始吧" />
   </div>
 </template>
 
@@ -86,40 +64,28 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { SearchOutlined, EnvironmentOutlined } from '@ant-design/icons-vue'
 import { getMyTrips } from '@/api/tripController'
+import { useVisualContent } from '@/composables/useVisualContent'
 import {
   formatWorkflowDate,
-  formatWorkflowDateTime,
   getTripStatusLabel,
-  getTripStatusTone,
   isTripPublished,
   normalizeTripStatus,
 } from '@/utils/tripWorkflow'
 
 const router = useRouter()
+const { fetchFirst } = useVisualContent()
+
 const trips = ref<API.TripVO[]>([])
 const keyword = ref('')
-const statusFilter = ref<'all' | 'planned' | 'completed'>('all')
-const assetFilter = ref<'all' | 'published'>('all')
-
-const plannedCount = computed(
-  () => trips.value.filter((trip) => normalizeTripStatus(trip.status) === 'planned').length
-)
-const publishedCount = computed(() => trips.value.filter((trip) => isTripPublished(trip)).length)
+const coverMap = ref<Record<number, string>>({})
 
 const filteredTrips = computed(() => {
   const text = keyword.value.trim().toLowerCase()
 
   return [...trips.value]
     .filter((trip) => {
-      if (statusFilter.value !== 'all' && normalizeTripStatus(trip.status) !== statusFilter.value) {
-        return false
-      }
-
-      if (assetFilter.value === 'published' && !isTripPublished(trip)) {
-        return false
-      }
-
       if (!text) {
         return true
       }
@@ -135,18 +101,28 @@ const filteredTrips = computed(() => {
     })
 })
 
-function highlightPreview(trip: API.TripVO) {
-  const highlights = trip.dailyHighlights || {}
-  return Object.values(highlights)
-    .flat()
-    .filter(Boolean)
-    .slice(0, 4)
-}
-
 async function loadTrips() {
   try {
     const resp = await getMyTrips()
-    trips.value = resp?.data?.data || []
+    const fetchedTrips = resp?.data?.data || []
+    trips.value = fetchedTrips
+    
+    fetchedTrips.forEach(async (trip) => {
+      if (!trip.id) return
+      
+      if (trip.photos && trip.photos[0]?.photoUrl) {
+        coverMap.value[trip.id] = trip.photos[0].photoUrl
+      } else if (trip.destination) {
+        try {
+          const img = await fetchFirst(trip.destination)
+          if (img) {
+            coverMap.value[trip.id] = img.mediumUrl || img.largeUrl || ''
+          }
+        } catch (err) {
+          // ignore
+        }
+      }
+    })
   } catch (error: unknown) {
     const responseMessage =
       typeof error === 'object' && error !== null && 'response' in error
@@ -165,10 +141,6 @@ function openTrip(id?: number) {
   router.push(`/trips/${id}`)
 }
 
-function goWorkspace() {
-  router.push('/workspace')
-}
-
 onMounted(loadTrips)
 </script>
 
@@ -176,161 +148,187 @@ onMounted(loadTrips)
 .trips-page {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 24px;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
-  padding: 28px 30px;
-  border-radius: 28px;
-  border: 1px solid rgba(15, 28, 46, 0.08);
-  background:
-    radial-gradient(circle at top right, rgba(47, 144, 240, 0.14), transparent 30%),
-    linear-gradient(135deg, #ffffff 0%, #f2f7ff 100%);
+  align-items: center;
+  margin-bottom: 12px;
 
   h1 {
-    margin: 8px 0 10px;
-    font-size: 34px;
-    color: var(--color-text);
-  }
-
-  p {
     margin: 0;
-    color: var(--color-muted);
-  }
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--primary-600);
-}
-
-.summary-grid,
-.trip-grid {
-  display: grid;
-  gap: 16px;
-}
-
-.summary-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.summary-card {
-  padding: 20px 22px;
-  border-radius: 22px;
-  border: 1px solid rgba(15, 28, 46, 0.08);
-  background: #ffffff;
-  box-shadow: 0 14px 36px rgba(18, 52, 97, 0.05);
-
-  strong {
-    display: block;
     font-size: 32px;
-    color: var(--color-text);
-  }
-
-  span {
-    color: var(--color-muted);
+    font-weight: 700;
+    color: #111827;
   }
 }
 
-.filter-bar {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) 180px 180px;
-  gap: 14px;
+.search-wrap {
+  width: 260px;
 }
 
-.search-input,
-.filter-item {
-  width: 100%;
+:deep(.custom-search-input) {
+  border-radius: 20px;
+  padding: 6px 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+
+  .ant-input {
+    background: transparent;
+  }
+  .ant-input:focus {
+    box-shadow: none;
+  }
 }
 
 .trip-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
 }
 
 .trip-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 22px;
+  padding: 16px;
   border-radius: 24px;
-  border: 1px solid rgba(15, 28, 46, 0.08);
+  border: 1px solid transparent;
   background: #ffffff;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 16px 40px rgba(18, 52, 97, 0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 
   &:hover {
-    transform: translateY(-2px);
-    border-color: rgba(59, 110, 220, 0.24);
-    box-shadow: 0 22px 48px rgba(18, 52, 97, 0.08);
-  }
-
-  h2 {
-    margin: 0;
-    font-size: 22px;
-    color: var(--color-text);
-  }
-
-  p {
-    margin: 6px 0 0;
-    color: var(--color-text-secondary);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
   }
 }
 
-.trip-top,
-.trip-meta,
-.trip-foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
+.card-cover {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  border-radius: 16px;
+  overflow: hidden;
+  background-color: #e2e8f0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 }
 
-.trip-meta,
-.trip-foot {
-  font-size: 13px;
-  color: var(--color-subtle);
+.cover-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #94a3b8 0%, #cbd5e1 100%);
 }
 
-.highlights {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.highlight-pill {
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(59, 110, 220, 0.08);
-  color: var(--primary-700);
+.status-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
-}
+  backdrop-filter: blur(4px);
+  background: rgba(255, 255, 255, 0.9);
 
-@media (max-width: 1100px) {
-  .summary-grid,
-  .trip-grid,
-  .filter-bar {
-    grid-template-columns: 1fr;
+  &.planned {
+    color: #3b82f6;
+  }
+  &.completed {
+    color: #10b981;
+  }
+  
+  .status-icon {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    border: 1.5px solid currentColor;
   }
 }
 
-@media (max-width: 768px) {
+.card-body {
+  padding: 16px 4px 4px;
+}
+
+.trip-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.trip-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action-btn {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  
+  &.planned {
+    background: #fca5a5;
+    color: #fff;
+  }
+  
+  &.completed {
+    background: #60a5fa;
+    color: #fff;
+  }
+}
+
+.trip-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.meta-separator {
+  width: 1px;
+  height: 10px;
+  background-color: #cbd5e1;
+}
+
+.meta-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 1024px) {
+  .trip-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .trip-grid {
+    grid-template-columns: 1fr;
+  }
   .page-header {
     flex-direction: column;
-    padding: 22px 20px;
-
-    h1 {
-      font-size: 28px;
-    }
+    align-items: flex-start;
+    gap: 16px;
   }
 }
 </style>

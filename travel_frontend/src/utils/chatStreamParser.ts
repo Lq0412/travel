@@ -75,9 +75,22 @@ export function extractStructuredData(text: string): StructuredItinerary | null 
 }
 
 export function removeStructuredDataMarkers(text: string): string {
-  return text
+  if (!text) {
+    return ''
+  }
+
+  const structuredStartIndex = text.indexOf(STRUCTURED_DATA_START)
+  const fencedJsonMatch = text.match(/```json\b/i)
+  const fencedJsonIndex = fencedJsonMatch?.index ?? -1
+
+  const cutPositions = [structuredStartIndex, fencedJsonIndex].filter((index) => index >= 0)
+  const firstCutIndex = cutPositions.length > 0 ? Math.min(...cutPositions) : -1
+
+  const visibleText = firstCutIndex >= 0 ? text.slice(0, firstCutIndex) : text
+
+  return visibleText
     .replace(/__STRUCTURED_DATA_START__[\s\S]*?__STRUCTURED_DATA_END__/g, '')
-    .replace(/```json[\s\S]*?```/g, '')
+    .replace(/```json[\s\S]*?```/gi, '')
     .trim()
 }
 

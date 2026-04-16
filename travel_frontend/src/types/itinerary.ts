@@ -8,6 +8,9 @@ export interface StructuredItinerary {
   days: number
   budget?: number
   theme?: string
+  weatherOverview?: string
+  accommodationOverview?: string
+  transportationOverview?: string
   dailyPlans: DailyPlan[]
   totalEstimatedCost?: number
   tips?: string[]
@@ -16,6 +19,7 @@ export interface StructuredItinerary {
 export interface DailyPlan {
   day: number
   date?: string
+  transportAdvice?: string
   activities: Activity[]
   meals?: Meal[]
 }

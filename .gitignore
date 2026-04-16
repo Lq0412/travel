@@ -1,1 +1,5 @@
 .worktrees/
+.env
+.idea/
+travel_backend/startup.err.log
+travel_backend/startup.out.log

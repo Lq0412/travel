@@ -38,9 +38,28 @@ public class ProductSchemaInitializer implements CommandLineRunner {
                   INDEX `idx_product_is_delete`(`is_delete` ASC) USING BTREE
                 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '商品表'
                 """);
-        jdbcTemplate.execute("ALTER TABLE product ADD COLUMN IF NOT EXISTS address varchar(512) NULL COMMENT '详细地址' AFTER city");
-        jdbcTemplate.execute("ALTER TABLE product ADD COLUMN IF NOT EXISTS latitude decimal(10,7) NULL COMMENT '纬度' AFTER cover");
-        jdbcTemplate.execute("ALTER TABLE product ADD COLUMN IF NOT EXISTS longitude decimal(10,7) NULL COMMENT '经度' AFTER latitude");
+        addColumnIfMissing("address", "ALTER TABLE product ADD COLUMN address varchar(512) NULL COMMENT '详细地址' AFTER city");
+        addColumnIfMissing("latitude", "ALTER TABLE product ADD COLUMN latitude decimal(10,7) NULL COMMENT '纬度' AFTER cover");
+        addColumnIfMissing("longitude", "ALTER TABLE product ADD COLUMN longitude decimal(10,7) NULL COMMENT '经度' AFTER latitude");
         log.info("商品表检查完成");
+    }
+
+    private void addColumnIfMissing(String columnName, String sql) {
+        Integer count = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND column_name = ?
+                """,
+                Integer.class,
+                "product",
+                columnName
+        );
+
+        if (count == null || count == 0) {
+            jdbcTemplate.execute(sql);
+        }
     }
 }

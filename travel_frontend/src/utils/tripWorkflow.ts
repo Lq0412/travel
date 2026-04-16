@@ -1,4 +1,5 @@
 export type PublicTripStatus = 'planned' | 'completed'
+export type RecentTripAction = 'recommend-products' | 'resume-trip'
 
 export function normalizeTripStatus(status?: string | null): PublicTripStatus {
   return status === 'completed' ? 'completed' : 'planned'
@@ -10,6 +11,10 @@ export function getTripStatusLabel(status?: string | null) {
 
 export function getTripStatusTone(status?: string | null) {
   return normalizeTripStatus(status) === 'completed' ? 'success' : 'processing'
+}
+
+export function shouldRestoreRecentTripItinerary(action: RecentTripAction) {
+  return action === 'resume-trip'
 }
 
 export function isTripPublished(trip?: API.TripVO | null) {

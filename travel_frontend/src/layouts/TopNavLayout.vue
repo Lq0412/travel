@@ -1,22 +1,40 @@
 <template>
-  <div class="top-layout" :class="{ 'is-workspace-route': isWorkspaceRoute }">
+  <div class="top-layout" :class="{ 'is-workspace-route': isWorkspaceRoute, 'is-home-route': isHomeRoute }">
     <header class="top-header" :class="{ scrolled: isScrolled }">
       <div class="top-inner">
         <router-link to="/" class="brand">
-          <svg class="brand-logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg
+            class="brand-logo"
+            viewBox="0 0 48 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
             <!-- 背景圆 -->
-            <circle cx="24" cy="24" r="22" fill="url(#logoGrad)"/>
+            <circle cx="24" cy="24" r="22" fill="url(#logoGrad)" />
             <!-- 山峰 -->
-            <path d="M12 32L20 20L26 26L36 14" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-            <path d="M8 36H40" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+            <path
+              d="M12 32L20 20L26 26L36 14"
+              stroke="white"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              fill="none"
+            />
+            <path
+              d="M8 36H40"
+              stroke="white"
+              stroke-width="2"
+              stroke-linecap="round"
+              opacity="0.6"
+            />
             <!-- 飞机 -->
-            <path d="M32 10L35 13L28 20L26 18L32 10Z" fill="white"/>
-            <path d="M26 18L22 22L24 24L28 20L26 18Z" fill="white" opacity="0.8"/>
+            <path d="M32 10L35 13L28 20L26 18L32 10Z" fill="white" />
+            <path d="M26 18L22 22L24 24L28 20L26 18Z" fill="white" opacity="0.8" />
             <!-- 渐变定义 -->
             <defs>
               <linearGradient id="logoGrad" x1="0" y1="0" x2="48" y2="48">
-                <stop offset="0%" stop-color="#38bdf8"/>
-                <stop offset="100%" stop-color="#0284c7"/>
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="100%" stop-color="#0284c7" />
               </linearGradient>
             </defs>
           </svg>
@@ -27,12 +45,7 @@
         </router-link>
 
         <nav class="nav" v-if="!isMobile">
-          <router-link
-            v-for="item in navItems"
-            :key="item.path"
-            :to="item.path"
-            class="nav-link"
-          >
+          <router-link v-for="item in navItems" :key="item.path" :to="item.path" class="nav-link">
             {{ item.label }}
           </router-link>
         </nav>
@@ -41,7 +54,10 @@
           <template v-if="isLoggedIn">
             <button class="user-chip" type="button" @click="goProfile">
               <img
-                :src="loginUserStore.loginUser.userAvatar || 'https://unpkg.com/lucide-static@latest/icons/user-circle.svg'"
+                :src="
+                  loginUserStore.loginUser.userAvatar ||
+                  'https://unpkg.com/lucide-static@latest/icons/user-circle.svg'
+                "
                 alt="avatar"
               />
               <span>{{ loginUserStore.loginUser.userName || '用户' }}</span>
@@ -105,12 +121,12 @@ const loginUserStore = useLoginUserStore()
 const navItems = computed(() => {
   const items = [
     { label: '首页', path: '/' },
-    { label: '规划行程', path: '/workspace' },
-    { label: '我的行程', path: '/trips' },
-    { label: '我的', path: '/profile' },
+    { label: '工作台', path: '/workspace' },
+    { label: '行程', path: '/trips' },
+    { label: '商城', path: '/mall' },
   ]
   if (loginUserStore.loginUser.userRole === 'admin') {
-    items.push({ label: 'AI监控', path: '/admin/ai-monitor' })
+    items.push({ label: '监控', path: '/admin/ai-monitor' })
   }
   return items
 })
@@ -119,7 +135,8 @@ const isScrolled = ref(false)
 const isMobile = ref(false)
 const showMobileMenu = ref(false)
 const isLoggedIn = computed(() => Boolean(loginUserStore.loginUser.id))
-const isWorkspaceRoute = computed(() => route.path === '/workspace')
+const isWorkspaceRoute = computed(() => route.path === '/workspace' || route.path.startsWith('/trips/'))
+const isHomeRoute = computed(() => route.path === '/')
 
 function syncViewport() {
   isMobile.value = window.innerWidth < 1100
@@ -200,6 +217,32 @@ onUnmounted(() => {
     linear-gradient(180deg, #f7faff 0%, #f4f7fb 220px, #f4f7fb 100%);
 }
 
+.top-layout.is-home-route {
+  background: transparent;
+}
+
+.top-layout.is-home-route .top-header {
+  position: absolute;
+  width: 100%;
+}
+
+.top-layout.is-home-route .top-header:not(.scrolled) {
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.top-layout.is-home-route .top-header:not(.scrolled) .brand,
+.top-layout.is-home-route .top-header:not(.scrolled) .nav-link,
+.top-layout.is-home-route .top-header:not(.scrolled) .brand small {
+  color: #ffffff;
+}
+
+.top-layout.is-home-route .top-header:not(.scrolled) .nav-link:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
 .top-layout.is-workspace-route {
   height: 100dvh;
   min-height: 100dvh;
@@ -211,7 +254,10 @@ onUnmounted(() => {
   top: 0;
   z-index: 30;
   padding: 14px 20px;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease, backdrop-filter 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    backdrop-filter 0.2s ease;
 
   &.scrolled {
     background: rgba(255, 255, 255, 0.86);
@@ -263,10 +309,12 @@ onUnmounted(() => {
   border-radius: 999px;
   color: var(--color-text-secondary);
   text-decoration: none;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 
   &:hover,
-  &.router-link-active {
+  &.router-link-exact-active {
     background: rgba(59, 110, 220, 0.1);
     color: var(--primary-700);
   }
@@ -341,6 +389,10 @@ onUnmounted(() => {
   padding: 14px 20px 28px;
 }
 
+.top-layout.is-home-route .main-shell {
+  padding: 0;
+}
+
 .top-layout.is-workspace-route .main-shell {
   min-height: 0;
   overflow: hidden;
@@ -354,6 +406,10 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+.top-layout.is-home-route .main-inner {
+  max-width: none;
 }
 
 .top-layout.is-workspace-route .main-inner {
@@ -379,8 +435,12 @@ onUnmounted(() => {
 }
 
 @media (max-width: 768px) {
-  .top-header,
-  .main-shell {
+  .top-header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  
+  .main-shell:not(.top-layout.is-home-route .main-shell) {
     padding-left: 12px;
     padding-right: 12px;
   }

@@ -1,132 +1,14 @@
-<template>
-  <div v-if="trip" class="trip-detail-page">
-    <section class="trip-hero">
-      <div class="hero-copy">
-        <p class="eyebrow">旅程工作区</p>
-        <h1>{{ trip.destination || '未命名行程' }} · {{ trip.days || 0 }} 天</h1>
-        <div class="hero-meta">
-          <span>主题：{{ trip.theme || '通用主题' }}</span>
-          <span>{{ trip.startDate ? `出发：${formatWorkflowDate(trip.startDate)}` : '出发时间待定' }}</span>
-          <span>最近更新：{{ formatWorkflowDateTime(trip.updateTime || trip.createTime) }}</span>
-        </div>
-      </div>
-
-      <div class="hero-actions">
-        <a-tag :color="getTripStatusTone(trip.status)">{{ getTripStatusLabel(trip.status) }}</a-tag>
-        <a-button v-if="normalizeTripStatus(trip.status) !== 'completed'" @click="markCompleted" :loading="completing">
-          标记已完成
-        </a-button>
-      </div>
-
-      <div class="hero-visuals" :class="{ 'single-card': !destinationPhoto }">
-        <article v-if="destinationPhoto" class="destination-photo">
-          <img :src="photoSrc(destinationPhoto)" :alt="`${trip.destination || '旅行'} 实景图`" />
-          <div class="destination-overlay">
-            <strong>{{ trip.destination || '真实旅途氛围' }}</strong>
-            <p>按目的地实时拉取实景图，让行程详情页直接连接真实旅行场景。</p>
-            <PexelsCredit :image="destinationPhoto" />
-          </div>
-        </article>
-
-        <article class="trip-illustration">
-          <img :src="illustrations.journey" alt="journey illustration" />
-          <div>
-            <strong>执行与沉淀继续在这里完成</strong>
-            <p>上传照片、管理行程，围绕同一个行程继续推进。</p>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="workflow-tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        type="button"
-        class="tab-trigger"
-        :class="{ active: activeTab === tab.key }"
-        @click="setTab(tab.key)"
-      >
-        <strong>{{ tab.label }}</strong>
-        <span>{{ tab.desc }}</span>
-      </button>
-    </section>
-
-    <section v-if="activeTab === 'overview'" class="content-stack">
-      <div class="content-grid">
-        <div class="content-card">
-          <div class="card-head">
-            <h2>旅程概览</h2>
-            <p>用统一状态和真实资产展示当前进度。</p>
-          </div>
-          <div class="overview-grid">
-            <div class="overview-item">
-              <strong>{{ getTripStatusLabel(trip.status) }}</strong>
-              <span>当前状态</span>
-            </div>
-            <div class="overview-item">
-              <strong>{{ trip.photos?.length || 0 }}</strong>
-              <span>已关联照片</span>
-            </div>
-            <div class="overview-item">
-              <strong>{{ totalHighlightCount }}</strong>
-              <span>可展示亮点</span>
-            </div>
-            <div class="overview-item">
-              <strong>{{ formatWorkflowDateTime(trip.updateTime || trip.createTime) }}</strong>
-              <span>最近推进</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="content-card">
-        <div class="card-head">
-          <h2>每日亮点</h2>
-          <p>把 AI 方案继续落到可执行的每日安排里。</p>
-        </div>
-
-        <a-collapse v-if="highlightEntries.length" ghost>
-          <a-collapse-panel
-            v-for="day in highlightEntries"
-            :key="day.day"
-            :header="`第 ${day.day} 天 · ${day.items.length} 个亮点`"
-          >
-            <ul class="highlight-list">
-              <li v-for="item in day.items" :key="item">{{ item }}</li>
-            </ul>
-          </a-collapse-panel>
-        </a-collapse>
-        <a-empty v-else description="当前还没有每日亮点" />
-      </div>
-    </section>
-
-    <section v-else-if="activeTab === 'photos'" class="content-card">
-      <div class="card-head">
-        <h2>照片管理</h2>
-        <p>把旅行素材和行程结果关联起来，形成答辩时可演示的完整资产页。</p>
-      </div>
-      <TripPhotoManager
-        v-if="trip?.id"
-        :trip-id="Number(trip.id)"
-        :initial-photos="trip.photos || []"
-        @photos-changed="handlePhotosChanged"
-      />
-    </section>
-  </div>
-</template>
-
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
-import {
-  completeTrip,
-  getTripById,
-} from '@/api/tripController'
-import PexelsCredit from '@/components/content/PexelsCredit.vue'
-import TripPhotoManager from '@/components/trips/TripPhotoManager.vue'
-import { useVisualContent } from '@/composables/useVisualContent'
+import { completeTrip, getTripById } from '@/api/tripController'
+import TripDaySwitcher from '@/components/trips/detail/TripDaySwitcher.vue'
+import TripDetailSummaryCards from '@/components/trips/detail/TripDetailSummaryCards.vue'
+import TripItineraryTimeline from '@/components/trips/detail/TripItineraryTimeline.vue'
+import DynamicMap from '@/pages/workspace/DynamicMap.vue'
+import type { StructuredItinerary } from '@/types/itinerary'
 import {
   formatWorkflowDate,
   formatWorkflowDateTime,
@@ -134,23 +16,44 @@ import {
   getTripStatusTone,
   normalizeTripStatus,
 } from '@/utils/tripWorkflow'
+import {
+  buildItinerarySummaryItems,
+  filterItineraryByDay,
+  parseStructuredTripData,
+} from '@/utils/tripDetail'
 
-type TripTab = 'overview' | 'photos'
+type SelectedDay = number | 'all'
+type TripDetailRecord = API.TripVO & { structuredData?: string }
 
 const route = useRoute()
 const router = useRouter()
-const { fetchFirst, illustrations } = useVisualContent()
 
-const tabs: Array<{ key: TripTab; label: string; desc: string }> = [
-  { key: 'overview', label: '概览', desc: '统一看进度与亮点' },
-  { key: 'photos', label: '照片', desc: '上传并管理素材' },
-]
-
-const activeTab = ref<TripTab>('overview')
-const trip = ref<API.TripVO | null>(null)
+const trip = ref<TripDetailRecord | null>(null)
+const structuredItinerary = ref<StructuredItinerary | null>(null)
+const selectedDay = ref<SelectedDay>('all')
+const selectedActivityKey = ref<string | null>(null)
 const completing = ref(false)
-const destinationPhoto = ref<API.ContentImageVO | null>(null)
-const lastDestinationQuery = ref('')
+
+const hasStructuredData = computed(() => Boolean(trip.value?.structuredData?.trim()))
+
+const availableDays = computed(() => {
+  if (!structuredItinerary.value) {
+    return []
+  }
+
+  return structuredItinerary.value.dailyPlans
+    .map((plan) => Number(plan.day))
+    .filter((day) => Number.isFinite(day))
+    .sort((left, right) => left - right)
+})
+
+const visibleItinerary = computed(() =>
+  filterItineraryByDay(structuredItinerary.value, selectedDay.value),
+)
+
+const summaryItems = computed(() => buildItinerarySummaryItems(structuredItinerary.value))
+
+const isSummaryExpanded = ref(true)
 
 const highlightEntries = computed(() => {
   const highlights = trip.value?.dailyHighlights
@@ -171,41 +74,33 @@ const totalHighlightCount = computed(() =>
   highlightEntries.value.reduce((sum, item) => sum + item.items.length, 0),
 )
 
-function syncTabFromRoute() {
-  const nextTab = route.query.tab
-  if (nextTab && tabs.some((tab) => tab.key === nextTab)) {
-    activeTab.value = nextTab as TripTab
-    return
-  }
-  activeTab.value = 'overview'
-}
+function setOverviewState(nextStructuredItinerary: StructuredItinerary | null) {
+  structuredItinerary.value = nextStructuredItinerary
+  selectedActivityKey.value = null
 
-function setTab(tab: TripTab) {
-  activeTab.value = tab
-  router.replace({
-    path: route.path,
-    query: tab === 'overview' ? {} : { ...route.query, tab },
-  })
-}
-
-function photoSrc(image?: API.ContentImageVO | null) {
-  return image?.landscapeUrl || image?.large2xUrl || image?.largeUrl || image?.mediumUrl || ''
-}
-
-async function loadDestinationPhoto(destination?: string | null) {
-  const query = destination?.trim()
-  if (!query) {
-    destinationPhoto.value = null
-    lastDestinationQuery.value = ''
+  if (!nextStructuredItinerary || availableDays.value.length === 0) {
+    selectedDay.value = 'all'
     return
   }
 
-  if (lastDestinationQuery.value === query && destinationPhoto.value) {
-    return
-  }
+  selectedDay.value = availableDays.value[0]
+}
 
-  lastDestinationQuery.value = query
-  destinationPhoto.value = await fetchFirst(`${query} travel destination landscape`)
+function handleSelectDay(value: SelectedDay) {
+  selectedDay.value = value
+  selectedActivityKey.value = null
+}
+
+function handleSelectActivity(key: string) {
+  selectedActivityKey.value = key
+}
+
+function handleMapSelectActivity(key: string) {
+  selectedActivityKey.value = key
+}
+
+function goBack() {
+  router.push('/trips')
 }
 
 async function refreshTrip() {
@@ -216,12 +111,14 @@ async function refreshTrip() {
 
   try {
     const resp = await getTripById({ id })
-    trip.value = resp?.data?.data || null
-    if (trip.value) {
-      await loadDestinationPhoto(trip.value.destination)
-    } else {
-      destinationPhoto.value = null
-      lastDestinationQuery.value = ''
+    const fetchedTrip = (resp?.data?.data || null) as TripDetailRecord | null
+    trip.value = fetchedTrip
+
+    const parsed = parseStructuredTripData(fetchedTrip?.structuredData)
+    setOverviewState(parsed)
+
+    if (fetchedTrip?.structuredData && !parsed) {
+      message.warning('结构化数据解析失败，当前已回退到基础摘要视图')
     }
   } catch (error: unknown) {
     const responseMessage =
@@ -269,295 +166,411 @@ function handlePhotosChanged(photos: API.TripPhotoVO[]) {
 }
 
 watch(
-  () => route.query.tab,
-  async () => {
-    syncTabFromRoute()
-  }
-)
-
-watch(
   () => route.params.id,
   async () => {
     await refreshTrip()
-  }
+  },
 )
 
 onMounted(async () => {
-  syncTabFromRoute()
   await refreshTrip()
 })
 </script>
 
+<template>
+  <div v-if="trip" class="trip-layout">
+    <!-- 左侧侧边栏 -->
+    <aside class="sidebar custom-scroll">
+      <!-- 固定的侧边栏头部区域 -->
+      <div class="sidebar-head">
+        <div class="sidebar-top-actions">
+          <a-button type="text" class="back-btn" @click="goBack">
+            <ArrowLeftOutlined />
+          </a-button>
+          <span class="head-title">itinerary Details</span>
+        </div>
+      </div>
+
+      <!-- 侧边栏可滚动的核心主内容区 -->
+      <div class="sidebar-scrollable custom-scroll">
+        <template v-if="structuredItinerary">
+          <!-- 日期切换器，跟随滚动 -->
+          <div class="timeline-day-switcher">
+            <TripDaySwitcher
+              :days="availableDays"
+              :selected-day="selectedDay"
+              @select="handleSelectDay"
+            />
+          </div>
+            
+            <!-- 时间线行程列表 -->
+            <div class="timeline-list-wrap">
+              <TripItineraryTimeline
+                :itinerary="visibleItinerary"
+                :selected-activity-key="selectedActivityKey"
+                @select-activity="handleSelectActivity"
+              />
+            </div>
+        </template>
+
+        <template v-else>
+          <div class="fallback-summary">
+             <h3 class="fallback-title">非结构化概览</h3>
+             <p class="fallback-desc">{{ hasStructuredData ? '无法解析结构数据。' : '当前行程无详细时间线。' }}</p>
+          </div>
+        </template>
+      </div>
+    </aside>
+
+    <!-- 右侧主视觉（地图与悬浮面板） -->
+    <main class="main-view">
+      <!-- 沉浸式全屏地图 -->
+      <div class="map-bg">
+        <DynamicMap
+          :itinerary="visibleItinerary"
+          :selected-activity-key="selectedActivityKey"
+          @select-activity="handleMapSelectActivity"
+        />
+      </div>
+
+      <!-- 悬浮层 (Glassmorphism overlays) -->
+      <div class="overlays-layer pointer-events-none">
+        <!-- 顶部信息浮层 -->
+        <div class="top-overlay glass-card pointer-events-auto">
+          <div class="top-stats">
+            <div class="stat-block">
+              <span class="stat-val">{{ trip.days || structuredItinerary?.days || 0 }}</span>
+              <span class="stat-label">DAYS</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-block">
+              <span class="stat-val">00</span>
+              <span class="stat-label">HRS</span>
+            </div>
+          </div>
+          <div class="trip-summary-info">
+            <div class="user-avatar-placeholder">A</div>
+            <div class="trip-meta-text">
+              <h4>{{ trip.destination || '未命名行程' }}</h4>
+              <p>{{ trip.theme || '通用旅行' }} · {{ formatWorkflowDate(trip.startDate) || '时间待定' }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右下角信息浮层 -->
+        <div v-if="structuredItinerary" class="right-overlay glass-card pointer-events-auto" :class="{ 'collapsed': !isSummaryExpanded }">
+          <div class="summary-card-header">
+            <h3>行程统计</h3>
+            <button class="collapse-btn" @click="isSummaryExpanded = !isSummaryExpanded" title="折叠/展开">
+              <svg v-if="isSummaryExpanded" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+          </div>
+          <!-- 收缩控制的内容层 -->
+          <div class="summary-content-wrap" v-show="isSummaryExpanded">
+            <TripDetailSummaryCards :items="summaryItems" />
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</template>
+
 <style scoped lang="scss">
-.trip-detail-page {
+.trip-layout {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.trip-hero,
-.content-card {
-  padding: 26px 28px;
-  border-radius: 28px;
-  border: 1px solid rgba(15, 28, 46, 0.08);
-  background: #ffffff;
-  box-shadow: 0 18px 48px rgba(18, 52, 97, 0.06);
-}
-
-.trip-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.02fr) minmax(320px, 0.98fr);
-  gap: 20px;
-  align-items: stretch;
-  background:
-    radial-gradient(circle at top right, rgba(47, 144, 240, 0.16), transparent 28%),
-    radial-gradient(circle at bottom left, rgba(212, 139, 31, 0.1), transparent 30%),
-    linear-gradient(135deg, #ffffff 0%, #f1f7ff 100%);
-
-  h1 {
-    margin: 8px 0 10px;
-    font-size: 36px;
-    color: var(--color-text);
-  }
-}
-
-.hero-copy {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 18px;
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--primary-600);
-}
-
-.hero-meta {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  color: var(--color-muted);
-}
-
-.hero-actions {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.hero-visuals {
-  display: grid;
-  grid-template-columns: minmax(0, 1.06fr) 220px;
-  gap: 14px;
-  min-height: 260px;
-
-  &.single-card {
-    grid-template-columns: 1fr;
-  }
-}
-
-.destination-photo,
-.trip-illustration {
+  height: 100%;
+  width: 100%;
   overflow: hidden;
-  border-radius: 24px;
-  border: 1px solid rgba(15, 28, 46, 0.08);
-  background: #ffffff;
+  background: #F4F7FB;
+  border-radius: 20px; /* 圆角呈现类卡片/APP的效果 */
+  box-shadow: 0 12px 48px rgba(15, 23, 42, 0.06); /* 增加悬浮投影感 */
+  /* 去除了 fixed 全屏定位，回归正常的文档流，受限于 TopNavLayout 的 1320px max-width */
 }
 
-.destination-photo {
-  position: relative;
-
-  img {
-    width: 100%;
-    height: 100%;
-    min-height: 260px;
-    object-fit: cover;
-    display: block;
-  }
+/* === 左侧栏 === */
+.sidebar {
+  width: 480px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04);
 }
 
-.destination-overlay {
-  position: absolute;
-  inset: auto 0 0 0;
-  padding: 18px;
-  background: linear-gradient(180deg, rgba(15, 28, 46, 0.06) 0%, rgba(15, 28, 46, 0.86) 100%);
+.sidebar-head {
+  padding: 32px 40px 24px;
+}
 
-  strong {
-    display: block;
-    margin-bottom: 6px;
-    color: #ffffff;
+.sidebar-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  .back-btn {
+    padding: 0;
     font-size: 20px;
   }
 
-  p {
-    margin: 0 0 10px;
-    color: rgba(255, 255, 255, 0.82);
+  .head-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a1a1a;
   }
 }
 
-.trip-illustration {
-  display: grid;
-  gap: 10px;
-  align-content: center;
-  justify-items: center;
-  padding: 18px;
-  text-align: center;
-  background: linear-gradient(180deg, #ffffff 0%, #eef5ff 100%);
+.sidebar-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 40px 40px;
+}
 
-  img {
-    width: min(100%, 180px);
-    height: auto;
-  }
+.timeline-day-switcher {
+  margin-bottom: 20px;
+}
 
-  strong {
-    color: var(--color-text);
-  }
-
-  p {
-    margin: 6px 0 0;
-    color: var(--color-muted);
+.timeline-list-wrap {
+  /* 自定义时间线内容的样式可以放这里，覆盖子组件的背景 */
+  :deep(.timeline-card) {
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    border-radius: 16px;
   }
 }
 
-.workflow-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+.fallback-summary,
+.photos-tab-wrap {
+  margin-top: 20px;
 }
 
-.tab-trigger {
-  padding: 18px;
-  border-radius: 22px;
-  border: 1px solid rgba(15, 28, 46, 0.08);
-  background: rgba(255, 255, 255, 0.82);
-  text-align: left;
+.ai-input-dock {
+  padding: 16px 24px 24px;
+  background: white;
+  border-top: 1px solid #f0f4f9;
+}
+
+.ai-input-bar {
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 30px;
+  padding: 8px 8px 8px 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.ai-icon-left {
+  color: #fbbf24;
+  font-size: 18px;
+}
+
+.ai-input-field {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #333;
+  &::placeholder {
+    color: #a0aec0;
+  }
+}
+
+.ai-send-btn {
+  background: #3b82f6;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-
-  strong,
-  span {
-    display: block;
-  }
-
-  strong {
-    margin-bottom: 6px;
-    color: var(--color-text);
-  }
-
-  span {
-    color: var(--color-muted);
-    font-size: 13px;
-  }
-
-  &.active {
-    border-color: rgba(59, 110, 220, 0.32);
-    background: rgba(234, 241, 255, 0.86);
-    box-shadow: 0 12px 30px rgba(18, 52, 97, 0.06);
-  }
-
+  color: white;
+  transition: transform 0.1s;
   &:hover {
-    transform: translateY(-2px);
+    transform: scale(1.05);
   }
 }
 
-.content-stack {
+/* === 右侧主视觉 === */
+.main-view {
+  flex: 1;
+  position: relative;
+}
+
+.map-bg {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  /* 取消现有DynamicMap内的padding等限制，让地图直接撑满 */
+  :deep(.map-container) {
+    height: 100% !important;
+    width: 100% !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+/* === 悬浮层通用类 === */
+.overlays-layer {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 20;
+  padding: 24px;
+}
+
+.pointer-events-none { pointer-events: none; }
+.pointer-events-auto { pointer-events: auto; }
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+}
+
+/* 顶部信息悬浮 */
+.top-overlay {
+  display: inline-flex;
+  align-items: center;
+  gap: 32px;
+  padding: 16px 24px;
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.top-stats {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.stat-block {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-}
+  align-items: center;
 
-.content-grid {
-  display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: 20px;
-}
-
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
-
-  h2 {
-    margin: 0;
-    font-size: 24px;
-    color: var(--color-text);
+  .stat-val {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #1e293b;
   }
-
-  p {
-    margin: 6px 0 0;
-    color: var(--color-muted);
+  .stat-label {
+    font-size: 10px;
+    color: #64748b;
+    letter-spacing: 1px;
   }
 }
 
-.card-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+.stat-divider {
+  height: 24px;
+  width: 1px;
+  background: rgba(0, 0, 0, 0.1);
 }
 
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.trip-summary-info {
+  display: flex;
+  align-items: center;
   gap: 12px;
-}
+  padding-left: 12px;
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
 
-.overview-item {
-  padding: 18px;
-  border-radius: 20px;
-  background: #f8fbff;
-  border: 1px solid rgba(15, 28, 46, 0.06);
-
-  strong,
-  span {
-    display: block;
+  .user-avatar-placeholder {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #475569;
   }
 
-  strong {
-    font-size: 24px;
-    color: var(--color-text);
-  }
-
-  span {
-    margin-top: 6px;
-    color: var(--color-muted);
-  }
-}
-
-.highlight-list {
-  display: grid;
-  gap: 10px;
-  padding-left: 18px;
-  margin: 0;
-  color: var(--color-text-secondary);
-}
-
-@media (max-width: 1200px) {
-  .trip-hero,
-  .hero-visuals,
-  .workflow-tabs,
-  .content-grid,
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .trip-hero,
-  .content-card {
-    padding: 22px 18px;
-  }
-
-  .trip-hero {
-    h1 {
-      font-size: 28px;
+  .trip-meta-text {
+    h4 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #1e293b;
     }
+    p {
+      margin: 2px 0 0;
+      font-size: 12px;
+      color: #64748b;
+    }
+  }
+}
+
+/* 右下侧图表悬浮 */
+.right-overlay {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 280px;
+  padding: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: bottom right;
+
+  &.collapsed {
+    width: 140px;
+    padding: 12px 16px;
+
+    .summary-card-header {
+      margin-bottom: 0;
+      h3 { font-size: 14px; }
+    }
+  }
+
+  .summary-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .collapse-btn {
+      background: rgba(0, 0, 0, 0.04);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      border-radius: 50%;
+      width: 26px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.08);
+        color: #334155;
+      }
+    }
+  }
+}
+
+/* 滚动条优化 */
+.custom-scroll {
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
   }
 }
 </style>

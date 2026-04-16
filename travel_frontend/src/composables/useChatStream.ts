@@ -37,6 +37,10 @@ function positiveNumber(value: unknown): number | undefined {
   return Number.isFinite(num) && num > 0 ? num : undefined
 }
 
+function sanitizeVisibleMessage(text: string): string {
+  return removeStructuredDataMarkers(filterAIResponse(text) || text)
+}
+
 function parseStructuredFromText(raw: string): StructuredItinerary | null {
   const value = (raw || '').trim()
   if (!value) {
@@ -71,6 +75,7 @@ function buildMeta(
 export function useChatStream() {
   const messages = ref<ChatItem[]>([])
   const isLoading = ref(false)
+  const loadingStage = ref<'analysis' | 'generation' | 'structuring'>('analysis')
   const structuredData = ref<StructuredItinerary | null>(null)
   const abortController = ref<AbortController | null>(null)
   const lastStructuredSignature = ref('')
@@ -91,6 +96,7 @@ export function useChatStream() {
     }
     lastStructuredSignature.value = signature
 
+    loadingStage.value = 'structuring'
     responseMeta.value = buildMeta('stream-marker', structured, {
       intentType: responseMeta.value?.intentType,
       intentDescription: responseMeta.value?.intentDescription,
@@ -146,7 +152,7 @@ export function useChatStream() {
         }
 
         if (!messages.value[index].text.trim() && aiResponse.content) {
-          messages.value[index].text = filterAIResponse(aiResponse.content) || aiResponse.content
+          messages.value[index].text = sanitizeVisibleMessage(aiResponse.content)
         }
 
         return false
@@ -165,7 +171,7 @@ export function useChatStream() {
       }
 
       if (!messages.value[index].text.trim() && aiResponse.content) {
-        messages.value[index].text = filterAIResponse(aiResponse.content) || aiResponse.content
+        messages.value[index].text = sanitizeVisibleMessage(aiResponse.content)
       }
 
       if (import.meta.env.DEV) {
@@ -218,9 +224,9 @@ export function useChatStream() {
       }
     }
     if (!messages.value[index].text.trim()) {
-      messages.value[index].text =
-        filterAIResponse(fullResponseBuffer) || removeStructuredDataMarkers(fullResponseBuffer) || fullResponseBuffer
+      messages.value[index].text = sanitizeVisibleMessage(fullResponseBuffer)
     }
+    loadingStage.value = 'analysis'
     isLoading.value = false
   }
 
@@ -237,7 +243,13 @@ export function useChatStream() {
     structuredData.value = null
     responseMeta.value = null
     lastStructuredSignature.value = ''
+    loadingStage.value = 'analysis'
     isLoading.value = true
+
+    const userText = (conversationTitle || task || '').trim()
+    if (userText) {
+      messages.value.push({ role: 'user', text: userText, time: new Date() })
+    }
 
     const index = messages.value.length
     messages.value.push({ role: 'ai', text: '', time: new Date() })
@@ -327,8 +339,11 @@ export function useChatStream() {
 
           trySetStructuredData(fullResponseBuffer, onStructuredData)
 
-          const filtered = filterAIResponse(fullResponseBuffer)
+          const filtered = sanitizeVisibleMessage(fullResponseBuffer)
           const hasDebugText = hasChatDebugMarkers(fullResponseBuffer)
+          if (filtered && !lastStructuredSignature.value) {
+            loadingStage.value = 'generation'
+          }
           messages.value[index].text =
             filtered || (!hasDebugText ? removeStructuredDataMarkers(fullResponseBuffer) : messages.value[index].text)
           onScroll(false)
@@ -353,6 +368,7 @@ export function useChatStream() {
             if (payload) {
               messages.value[index].text = payload
             }
+            loadingStage.value = 'analysis'
             isLoading.value = false
             return true
           }
@@ -421,6 +437,7 @@ export function useChatStream() {
           } catch (error: unknown) {
             if (!isAbortError(error)) {
               console.error('Stream processing error:', error)
+              loadingStage.value = 'analysis'
               isLoading.value = false
             }
           }
@@ -432,6 +449,7 @@ export function useChatStream() {
           console.error('Fetch error:', error)
           messages.value[index].text += '\n\n❌ 连接失败，请检查网络或重新登录'
         }
+        loadingStage.value = 'analysis'
         isLoading.value = false
       })
   }
@@ -439,10 +457,11 @@ export function useChatStream() {
   const closeStream = () => {
     abortController.value?.abort()
     abortController.value = null
+    loadingStage.value = 'analysis'
     isLoading.value = false
   }
 
   onBeforeUnmount(() => closeStream())
 
-  return { messages, isLoading, structuredData, responseMeta, startStream, closeStream }
+  return { messages, isLoading, loadingStage, structuredData, responseMeta, startStream, closeStream }
 }

@@ -292,7 +292,7 @@ public class DashScopeProvider implements AIProvider {
      */
     private List<Message> buildDashScopeMessages(AIRequest request) {
         List<Message> messages = new ArrayList<>();
-        
+
         // 添加系统提示词
         if (request.getSystemPrompt() != null && !request.getSystemPrompt().isEmpty()) {
             messages.add(Message.builder()
@@ -300,8 +300,9 @@ public class DashScopeProvider implements AIProvider {
                     .content(request.getSystemPrompt())
                     .build());
         }
-        
-        // 添加历史消息
+
+        // 添加历史消息，确保角色校验
+        List<Message> historyMessages = new ArrayList<>();
         if (request.getHistory() != null) {
             for (AIRequest.Message msg : request.getHistory()) {
                 String role = switch (msg.getRole()) {
@@ -309,20 +310,56 @@ public class DashScopeProvider implements AIProvider {
                     case "assistant" -> "assistant";
                     default -> "user";
                 };
-                
-                messages.add(Message.builder()
+
+                // DashScope不允许空内容
+                String content = msg.getContent() != null ? msg.getContent() : " ";
+                if (content.trim().isEmpty()) {
+                    content = " ";
+                }
+
+                historyMessages.add(Message.builder()
                         .role(role)
-                        .content(msg.getContent())
+                        .content(content)
                         .build());
             }
         }
-        
+
+        // 清理历史消息，确保第一个并非 system 的消息是 user，并避免连续相同角色
+        String lastRole = "system"; // 初始状态认为上一个是 system
+        for (Message msg : historyMessages) {
+            // 如果历史记录里竟然有 system，直接忽略，避免多个 system
+            if ("system".equals(msg.getRole())) {
+                continue;
+            }
+            
+            // 确保紧接着 system 之后必须是 user
+            if ("system".equals(lastRole) && "assistant".equals(msg.getRole())) {
+                continue;
+            }
+
+            // 确保不连续相同角色
+            if (!msg.getRole().equals(lastRole)) {
+                messages.add(msg);
+                lastRole = msg.getRole();
+            }
+        }
+
+        // 确保当前消息角色与上一条相反（当前必定是user）
+        // 如果最后一条也是user，那么移除上一条
+        if ("user".equals(lastRole) && !messages.isEmpty()) {
+            Message lastMsg = messages.get(messages.size() - 1);
+            if (!"system".equals(lastMsg.getRole())) {
+                messages.remove(messages.size() - 1);
+            }
+        }
+
         // 添加当前用户消息
+        String currentContent = request.getMessage() != null ? request.getMessage() : "你好";
         messages.add(Message.builder()
                 .role("user")
-                .content(request.getMessage())
+                .content(currentContent)
                 .build());
-        
+
         return messages;
     }
 }

@@ -11,9 +11,15 @@
 import { ref, onMounted, watch, onUnmounted, shallowRef } from 'vue'
 import AMapLoader from '@amap/amap-jsapi-loader'
 import type { StructuredItinerary } from '@/types/itinerary'
+import { buildStructuredActivityKey } from '@/utils/tripDetail'
 
 const props = defineProps<{
   itinerary: StructuredItinerary | null
+  selectedActivityKey?: string | null
+}>()
+
+const emit = defineEmits<{
+  selectActivity: [key: string]
 }>()
 
 const mapContainer = ref<HTMLElement | null>(null)
@@ -31,7 +37,25 @@ const positionCache = new Map<string, [number, number] | null>()
 const MAX_GEOCODE_CONCURRENCY = 4
 
 // 定义一组高级感的颜色，用于区分不同天数的路线和标记
-const DAY_COLORS = ['#1360ff', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
+const DAY_COLORS = ['#ff7a45', '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#f97316'];
+
+// 封装一套炫酷的生成点标记样式的方法
+function getMarkerHtml(dayColor: string, isSelected: boolean) {
+  // 夸张地放大图标，强化阴影和透明度对比来提升立体 3D 浮在空中的效果
+  return `
+    <div style="position: relative; width: 48px; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; transform: ${isSelected ? 'scale(1.4) translateY(-10px)' : 'scale(1)'}; transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);">
+      <!-- 极具深度的底层环境投影光晕 -->
+      <div style="position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); width: 36px; height: 16px; background: ${dayColor}; border-radius: 50%; opacity: ${isSelected ? 0.4 : 0.25}; filter: blur(4px); transition: all 0.4s;"></div>
+      <!-- 硬边缘核心阴影 -->
+      <div style="position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%); width: 14px; height: 6px; background: rgba(0,0,0,0.5); border-radius: 50%; filter: blur(2px);"></div>
+      <!-- 带有洞的水滴针脚，放大尺寸，增加内部高光和外部弥散阴影 -->
+      <div style="position: relative; width: 38px; height: 38px; background: linear-gradient(135deg, ${dayColor} 0%, rgba(0,0,0,0.2) 200%); border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: inset -4px -4px 8px rgba(0,0,0,0.15), inset 4px 4px 6px rgba(255,255,255,0.4), 0 8px 16px rgba(0,0,0,0.15);">
+        <!-- 内部白色的洞，加强深度 -->
+        <div style="width: 14px; height: 14px; background: #fff; border-radius: 50%; box-shadow: inset 0 3px 6px rgba(0,0,0,0.3), 0 2px 4px rgba(255,255,255,0.8);"></div>
+      </div>
+    </div>
+  `
+}
 
 onMounted(async () => {
   if (!mapContainer.value) return
@@ -84,11 +108,15 @@ onUnmounted(() => {
   placeSearch.value = null
 })
 
-watch(() => props.itinerary, async (newItinerary) => {
-  if (mapInstance.value && AMapObj) {
-    await drawItinerary(newItinerary)
-  }
-}, { deep: true })
+watch(
+  () => [props.itinerary, props.selectedActivityKey] as const,
+  async ([newItinerary]) => {
+    if (mapInstance.value && AMapObj) {
+      await drawItinerary(newItinerary)
+    }
+  },
+  { deep: true },
+)
 
 function clearMap() {
   if (!mapInstance.value) {
@@ -376,8 +404,9 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
     const resolvedActivities = await mapWithConcurrency(
       orderedActivities,
       MAX_GEOCODE_CONCURRENCY,
-      async ({ activity }) => ({
+      async ({ activity, index }) => ({
         activity,
+        index,
         point: await resolveActivityPosition(itinerary, activity),
       }),
     )
@@ -392,6 +421,7 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
       }
 
       const activity = resolved.activity
+      const activityKey = buildStructuredActivityKey(currentDay, activity, resolved.index)
       const [lng, lat] = resolved.point
       const overlapKey = `${lng.toFixed(6)},${lat.toFixed(6)}`
       const overlapCount = overlapCounter.get(overlapKey) || 0
@@ -406,11 +436,13 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
       totalPointsCount++
 
       const dayColor = DAY_COLORS[(currentDay - 1) % DAY_COLORS.length]
+      const isSelected = props.selectedActivityKey === activityKey
 
       const marker = new AMapObj.Marker({
         position: [displayLng, displayLat],
         title: `第${currentDay}天 - ${activity.name || '景点'}`,
       })
+      marker.__activityKey = activityKey
       if (typeof marker.setLabel === 'function') {
         const timeRank = periodRank(activity?.time)
         let emoji = timeRank === 1 ? '🌅' : timeRank === 2 ? '☀️' : timeRank === 3 ? '🌙' : '📌'
@@ -418,14 +450,26 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
         if (activity?.type === 'rest' || nameOrDesc.includes('酒店') || nameOrDesc.includes('民宿') || nameOrDesc.includes('住')) {
           emoji = '🏨'
         }
+        
+        marker.setContent(getMarkerHtml(dayColor, isSelected)) // 用完全自定的HTML替代默认水滴
+        
+        // 纯净显示名称标签，大幅提升字号和投影使其更醒目，并且摒弃背景方框
         marker.setLabel({
           direction: 'top',
-          offset: new AMapObj.Pixel(0, -8),
-          content: `<span style="display:inline-block;background:#fff;border:1px solid ${dayColor};color:${dayColor};padding:2px 8px;border-radius:999px;font-size:12px;font-weight:bold;box-shadow:0 2px 6px rgba(0,0,0,0.1);"><span style="margin-right:4px">${emoji}</span>${activity.name || '景点'}</span>`,
+          offset: new AMapObj.Pixel(0, -16),
+          content: `<div style="color: ${isSelected ? dayColor : '#1e293b'}; font-size: ${isSelected ? '18px' : '15px'}; font-weight: 900; text-shadow: -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff, 2px 2px 0 #fff, 0 4px 12px rgba(0,0,0,0.5); text-align: center; white-space: nowrap; transform: ${isSelected ? 'translateY(-12px)' : 'translateY(0)'}; transition: all 0.3s; pointer-events: none;">${activity.name || '打卡点'}</div>`,
         })
       }
 
+      if (typeof marker.setzIndex === 'function') {
+        marker.setzIndex(isSelected ? 160 : 100)
+      }
+      if (typeof marker.setTop === 'function' && isSelected) {
+        marker.setTop(true)
+      }
+
       marker.on('click', () => {
+        emit('selectActivity', activityKey)
         const infoWindow = new AMapObj.InfoWindow({
           content: `
             <div style="padding: 10px; max-width: 250px;">
@@ -488,10 +532,10 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
               path: path,
               isOutline: true,
               outlineColor: '#ffffff',
-              borderWeight: 2,
+              borderWeight: 3, // 描边增厚，增强与背景图的分离感
               strokeColor: color,
-              strokeOpacity: 0.9,
-              strokeWeight: 6,
+              strokeOpacity: 0.95,
+              strokeWeight: 10, // 主路线暴增到 10px，非常夸张醒目
               showDir: true,
               lineJoin: 'round',
               lineCap: 'round',
@@ -504,10 +548,10 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
               path: dayPts,
               isOutline: true,
               outlineColor: '#ffffff',
-              borderWeight: 2,
+              borderWeight: 3,
               strokeColor: color,
-              strokeOpacity: 0.9,
-              strokeWeight: 6,
+              strokeOpacity: 0.95,
+              strokeWeight: 10,
               showDir: true,
               lineJoin: 'round',
               lineCap: 'round',
@@ -590,6 +634,15 @@ async function drawItinerary(itinerary: StructuredItinerary | null) {
     setTimeout(() => {
       const overlays = [...markerList, ...polylineLayers]
       mapInstance.value.setFitView(overlays, false, [60, 60, 60, 60])
+
+      if (props.selectedActivityKey) {
+        const selectedMarker = markerList.find((marker: any) => {
+          return marker?.__activityKey === props.selectedActivityKey
+        })
+        if (selectedMarker && typeof selectedMarker.getPosition === 'function') {
+          mapInstance.value.setCenter(selectedMarker.getPosition())
+        }
+      }
     }, 800)
   } else {
     showNoDataHint.value = true
@@ -689,6 +742,13 @@ function wgs84togcj02(lon: number, lat: number) {
 }
 
 /* Custom Marker Styling & Animations - 兼容高德直接注入的 HTML */
+:deep(.amap-marker-label) {
+  border: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
 :deep(.custom-poi-marker) {
   position: relative;
   width: 28px;

@@ -18,6 +18,7 @@ public class EnhancedStreamCallbackAdapter implements StreamCallback {
     private final IntentType intent;
     private final StringBuilder fullResponse = new StringBuilder();
     private boolean structuredDataSent = false;
+    private String normalizedStructuredJson;
     
     public EnhancedStreamCallbackAdapter(StreamCallback delegate, IntentType intent) {
         this.delegate = delegate;
@@ -72,11 +73,15 @@ public class EnhancedStreamCallbackAdapter implements StreamCallback {
         Optional<String> normalizedJson = StructuredItineraryExtractor.extractAndNormalize(fullResponse.toString());
         if (normalizedJson.isPresent()) {
             try {
+                normalizedStructuredJson = normalizedJson.get();
                 delegate.onData("\n__STRUCTURED_DATA_START__\n");
-                delegate.onData(normalizedJson.get());
+                delegate.onData(normalizedStructuredJson);
                 delegate.onData("\n__STRUCTURED_DATA_END__\n");
+                fullResponse.append("\n__STRUCTURED_DATA_START__\n")
+                        .append(normalizedStructuredJson)
+                        .append("\n__STRUCTURED_DATA_END__\n");
                 structuredDataSent = true;
-                log.info("已提取并发送标准化结构化数据，长度: {} 字符, 意图: {}", normalizedJson.get().length(), intent.getDescription());
+                log.info("已提取并发送标准化结构化数据，长度: {} 字符, 意图: {}", normalizedStructuredJson.length(), intent.getDescription());
             } catch (Exception e) {
                 log.error("发送结构化数据失败", e);
             }

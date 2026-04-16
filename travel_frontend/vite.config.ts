@@ -41,9 +41,9 @@ export default defineConfig({
     },
   },
   server: {
-    host: '127.0.0.1',
+    host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['1147cmmi93389.vicp.fun'],
+    allowedHosts: ['192.168.1.100', 'localhost'],
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8080',
@@ -53,4 +53,5 @@ export default defineConfig({
       },
     },
   },
+
 })
