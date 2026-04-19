@@ -89,6 +89,7 @@ function formatDistance(distanceMeters: number) {
 }
 
 export function getMatchedProductsByTrip(products: Product[], trip: TripLike): Product[] {
+  const MAX_DISTANCE_METERS = 30_000
   const destination = normalizeCity(trip.destination)
   const matched = products.filter((product) => {
     return product.isRecommendable && normalizeCity(product.city) === destination
@@ -129,6 +130,7 @@ export function getMatchedProductsByTrip(products: Product[], trip: TripLike): P
         index,
       }
     })
+    .filter((item) => item.distance <= MAX_DISTANCE_METERS)
     .sort((left, right) => {
       if (left.distance === right.distance) {
         return left.index - right.index

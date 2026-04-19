@@ -72,6 +72,15 @@
     </header>
 
     <section v-if="isLoggedIn" class="planner-stage">
+      <div class="planning-animation" v-if="isLoading && (loadingStage === 'generation' || loadingStage === 'structuring')">
+        <div class="planning-card">
+          <a-spin size="large" />
+          <p class="planning-text">
+            {{ loadingStage === 'structuring' ? '正在整理行程...' : '正在规划行程...' }}
+          </p>
+        </div>
+      </div>
+
       <div class="stage-content" :class="{ 'map-hidden': !mapVisible }" v-show="currentItinerary">
         <div class="timeline-panel" :class="{ 'timeline-panel-full': !mapVisible }">
           <ItineraryTimelineBoard
@@ -114,8 +123,7 @@
               <span>{{ item.role === 'user' ? '我' : '旅行助手' }}</span>
               <span>{{ formatChatTime(item.time) }}</span>
             </div>
-            <div v-if="item.text" class="chat-message-text">
-              {{ getChatMessageDisplayText(item, index) }}
+            <div v-if="item.text" class="chat-message-text" v-html="renderChatText(getChatMessageDisplayText(item, index))">
             </div>
             <ChatRecommendationCards
               v-if="item.recommendationCards"
@@ -255,6 +263,16 @@ function getChatMessageDisplayText(item: { role: 'user' | 'ai'; text: string }, 
   })
 }
 
+function renderChatText(text: string): string {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>')
+}
+
 function finalizePendingRecommendationCards() {
   if (!pendingRecommendationCards.value) {
     return
@@ -273,6 +291,7 @@ watch(structuredData, (data) => {
   }
 
   applyStructuredItinerary(data)
+  chatPanelCollapsed.value = true
 })
 
 function applyStructuredItinerary(data: StructuredItinerary) {
@@ -1024,6 +1043,38 @@ onMounted(() => {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+}
+
+.planning-animation {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.planning-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.planning-card .planning-text {
+  font-size: 14px;
+  font-weight: 400;
+  color: #475569;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.planning-card :deep(.ant-spin) {
+  color: #94a3b8;
 }
 
 .stage-content {
