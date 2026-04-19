@@ -1,6 +1,14 @@
 package com.lq.travel.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lq.travel.model.dto.ai.AIRequest;
+import com.lq.travel.model.dto.ai.AIResponse;
 import com.lq.travel.model.entity.AIMessage;
+import com.lq.travel.service.AIService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -12,8 +20,23 @@ import java.util.regex.Pattern;
 /**
  * 从对话历史中提取旅行规划记忆摘要。
  * 用于把已确认信息注入后续轮次，避免模型重复追问。
+ * 先尝试 LLM 提取，失败时回退到正则表达式。
  */
-public final class TravelConversationMemory {
+@Component
+public class TravelConversationMemory {
+
+    private static final Logger log = LoggerFactory.getLogger(TravelConversationMemory.class);
+
+    private static final String EXTRACTION_SYSTEM_PROMPT = """
+            你是旅行信息提取器。从对话历史中提取用户已确认的旅行信息，返回JSON：
+            {"destination":"目的地","travelDate":"出行时间","days":"天数","budget":"预算","accommodation":"住宿偏好","transport":"交通方式","companions":"同行人","isReadyForItinerary":true或false}
+
+            规则：
+            - 只提取用户明确说出的信息，不猜测。未确认的字段值为空字符串。
+            - isReadyForItinerary为true需要满足：目的地、出行时间、天数已确认。
+            - 住宿偏好和交通方式缺失不影响isReadyForItinerary。
+            - 只返回JSON，不要其他内容。
+            """;
 
     private static final Pattern DESTINATION_LABEL_PATTERN = Pattern.compile("(?:目的地|城市|地点)\\s*[:：]\\s*([\\p{IsHan}A-Za-z0-9·]{2,20})");
     private static final Pattern DESTINATION_VERB_PATTERN = Pattern.compile("(?:去|到|前往|想去|打算去|计划去)([\\p{IsHan}A-Za-z0-9·]{2,20})");
@@ -29,10 +52,127 @@ public final class TravelConversationMemory {
             "就这样", "可以", "好的", "好呀", "好哦", "好呢", "行", "行吧", "收到", "明白了", "继续", "下一步"
     );
 
-    private TravelConversationMemory() {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    private final AIService aiService;
+
+    public TravelConversationMemory(AIService aiService) {
+        this.aiService = aiService;
     }
 
-    public static MemorySnapshot analyze(List<AIMessage> messages) {
+    /**
+     * Instance method: tries LLM extraction first, falls back to regex.
+     */
+    public MemorySnapshot analyze(List<AIMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return new MemorySnapshot("", "", "", "", "", "", "");
+        }
+
+        // Try LLM extraction first
+        try {
+            MemorySnapshot llmResult = extractViaLLM(messages);
+            if (llmResult != null) {
+                return llmResult;
+            }
+        } catch (Exception e) {
+            log.debug("LLM extraction failed, falling back to regex: {}", e.getMessage());
+        }
+
+        // Fallback to regex
+        return extractViaRegex(messages);
+    }
+
+    /**
+     * Static compatibility shim for callers not yet migrated to the Spring bean.
+     * Delegates to regex-only extraction (no LLM).
+     */
+    public static MemorySnapshot analyzeStatic(List<AIMessage> messages) {
+        return extractViaRegex(messages);
+    }
+
+    private MemorySnapshot extractViaLLM(List<AIMessage> messages) {
+        String conversationText = buildConversationText(messages);
+        if (!StringUtils.hasText(conversationText)) {
+            return null;
+        }
+
+        AIRequest request = AIRequest.builder()
+                .message(conversationText)
+                .systemPrompt(EXTRACTION_SYSTEM_PROMPT)
+                .temperature(0.0)
+                .maxTokens(300)
+                .build();
+
+        AIResponse response = aiService.chat(request);
+
+        if (response == null || !Boolean.TRUE.equals(response.getSuccess()) || !StringUtils.hasText(response.getContent())) {
+            return null;
+        }
+
+        return parseLLMResponse(response.getContent());
+    }
+
+    private MemorySnapshot parseLLMResponse(String content) {
+        try {
+            // Extract JSON from the response (may have markdown code blocks)
+            String json = content.trim();
+            if (!json.startsWith("{")) {
+                int start = json.indexOf('{');
+                int end = json.lastIndexOf('}');
+                if (start >= 0 && end > start) {
+                    json = json.substring(start, end + 1);
+                }
+            }
+
+            JsonNode node = OBJECT_MAPPER.readTree(json);
+
+            String destination = getTextValue(node, "destination");
+            String travelDate = getTextValue(node, "travelDate");
+            String days = getTextValue(node, "days");
+            String budget = getTextValue(node, "budget");
+            String accommodation = getTextValue(node, "accommodation");
+            String transport = getTextValue(node, "transport");
+            String companions = getTextValue(node, "companions");
+            boolean llmReady = node.has("isReadyForItinerary") && node.get("isReadyForItinerary").asBoolean(false);
+
+            return new LLMEnhancedSnapshot(destination, travelDate, days, budget, accommodation, transport, companions, llmReady);
+        } catch (Exception e) {
+            log.debug("Failed to parse LLM response as JSON: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String getTextValue(JsonNode node, String field) {
+        if (node.has(field) && !node.get(field).isNull()) {
+            String value = node.get(field).asText("");
+            return StringUtils.hasText(value) ? value : "";
+        }
+        return "";
+    }
+
+    private String buildConversationText(List<AIMessage> messages) {
+        StringBuilder sb = new StringBuilder();
+        for (AIMessage message : messages) {
+            if (message == null || !StringUtils.hasText(message.getContent())) {
+                continue;
+            }
+            String role = message.getRole();
+            if ("user".equalsIgnoreCase(role)) {
+                sb.append("用户：").append(message.getContent().trim()).append("\n");
+            } else if ("assistant".equalsIgnoreCase(role)) {
+                sb.append("助手：").append(message.getContent().trim()).append("\n");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    // ==================== Regex-based extraction (static, used as fallback) ====================
+
+    private static MemorySnapshot extractViaRegex(List<AIMessage> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return new MemorySnapshot("", "", "", "", "", "", "");
+        }
+
         String destination = "";
         String travelDate = "";
         String days = "";
@@ -41,53 +181,51 @@ public final class TravelConversationMemory {
         String transport = "";
         String companions = "";
 
-        if (messages != null) {
-            for (AIMessage message : messages) {
-                if (message == null || !isUserMessage(message.getRole())) {
-                    continue;
-                }
+        for (AIMessage message : messages) {
+            if (message == null || !isUserMessage(message.getRole())) {
+                continue;
+            }
 
-                String content = message.getContent();
-                if (!StringUtils.hasText(content)) {
-                    continue;
-                }
+            String content = message.getContent();
+            if (!StringUtils.hasText(content)) {
+                continue;
+            }
 
-                String normalizedContent = content.trim();
+            String normalizedContent = content.trim();
 
-                String detectedDestination = detectDestination(normalizedContent);
-                if (StringUtils.hasText(detectedDestination)) {
-                    destination = detectedDestination;
-                }
+            String detectedDestination = detectDestination(normalizedContent);
+            if (StringUtils.hasText(detectedDestination)) {
+                destination = detectedDestination;
+            }
 
-                String detectedDate = detectTravelDate(normalizedContent);
-                if (StringUtils.hasText(detectedDate)) {
-                    travelDate = detectedDate;
-                }
+            String detectedDate = detectTravelDate(normalizedContent);
+            if (StringUtils.hasText(detectedDate)) {
+                travelDate = detectedDate;
+            }
 
-                String detectedDays = detectDays(normalizedContent);
-                if (StringUtils.hasText(detectedDays)) {
-                    days = detectedDays;
-                }
+            String detectedDays = detectDays(normalizedContent);
+            if (StringUtils.hasText(detectedDays)) {
+                days = detectedDays;
+            }
 
-                String detectedBudget = detectBudget(normalizedContent);
-                if (StringUtils.hasText(detectedBudget)) {
-                    budget = detectedBudget;
-                }
+            String detectedBudget = detectBudget(normalizedContent);
+            if (StringUtils.hasText(detectedBudget)) {
+                budget = detectedBudget;
+            }
 
-                String detectedAccommodation = detectAccommodation(normalizedContent);
-                if (StringUtils.hasText(detectedAccommodation)) {
-                    accommodation = detectedAccommodation;
-                }
+            String detectedAccommodation = detectAccommodation(normalizedContent);
+            if (StringUtils.hasText(detectedAccommodation)) {
+                accommodation = detectedAccommodation;
+            }
 
-                String detectedTransport = detectTransport(normalizedContent);
-                if (StringUtils.hasText(detectedTransport)) {
-                    transport = detectedTransport;
-                }
+            String detectedTransport = detectTransport(normalizedContent);
+            if (StringUtils.hasText(detectedTransport)) {
+                transport = detectedTransport;
+            }
 
-                String detectedCompanions = detectCompanions(normalizedContent);
-                if (StringUtils.hasText(detectedCompanions)) {
-                    companions = detectedCompanions;
-                }
+            String detectedCompanions = detectCompanions(normalizedContent);
+            if (StringUtils.hasText(detectedCompanions)) {
+                companions = detectedCompanions;
             }
         }
 
@@ -217,14 +355,55 @@ public final class TravelConversationMemory {
         return normalized;
     }
 
-    public record MemorySnapshot(
-            String destination,
-            String travelDate,
-            String days,
-            String budget,
-            String accommodation,
-            String transport,
-            String companions) {
+    // ==================== MemorySnapshot (converted from record to class) ====================
+
+    public static class MemorySnapshot {
+        private final String destination;
+        private final String travelDate;
+        private final String days;
+        private final String budget;
+        private final String accommodation;
+        private final String transport;
+        private final String companions;
+
+        public MemorySnapshot(String destination, String travelDate, String days,
+                              String budget, String accommodation, String transport, String companions) {
+            this.destination = destination;
+            this.travelDate = travelDate;
+            this.days = days;
+            this.budget = budget;
+            this.accommodation = accommodation;
+            this.transport = transport;
+            this.companions = companions;
+        }
+
+        public String destination() {
+            return destination;
+        }
+
+        public String travelDate() {
+            return travelDate;
+        }
+
+        public String days() {
+            return days;
+        }
+
+        public String budget() {
+            return budget;
+        }
+
+        public String accommodation() {
+            return accommodation;
+        }
+
+        public String transport() {
+            return transport;
+        }
+
+        public String companions() {
+            return companions;
+        }
 
         public boolean hasAnySignal() {
             return StringUtils.hasText(destination)
@@ -302,6 +481,24 @@ public final class TravelConversationMemory {
             if (StringUtils.hasText(value)) {
                 builder.append("- ").append(label).append("：").append(value.trim()).append("\n");
             }
+        }
+    }
+
+    // ==================== LLM-enhanced snapshot ====================
+
+    public static class LLMEnhancedSnapshot extends MemorySnapshot {
+        private final boolean llmReadyForItinerary;
+
+        public LLMEnhancedSnapshot(String destination, String travelDate, String days,
+                                   String budget, String accommodation, String transport,
+                                   String companions, boolean llmReadyForItinerary) {
+            super(destination, travelDate, days, budget, accommodation, transport, companions);
+            this.llmReadyForItinerary = llmReadyForItinerary;
+        }
+
+        @Override
+        public boolean isReadyForItinerary() {
+            return llmReadyForItinerary;
         }
     }
 }

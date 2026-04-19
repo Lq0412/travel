@@ -190,7 +190,7 @@ public class AIController {
                 if (conversationId != null) {
                     try {
                         List<AIMessage> conversationMessages = messageService.getConversationMessages(conversationId);
-                        TravelConversationMemory.MemorySnapshot memorySnapshot = TravelConversationMemory.analyze(conversationMessages);
+                        TravelConversationMemory.MemorySnapshot memorySnapshot = TravelConversationMemory.analyzeStatic(conversationMessages);
 
                         if (memorySnapshot.hasAnySignal()) {
                             String memoryBlock = memorySnapshot.toPromptBlock();
