@@ -59,6 +59,12 @@ public class AIController {
     
     @Resource
     private QuotaService quotaService;
+
+    @Resource
+    private IntentAwareChatEnhancer intentAwareChatEnhancer;
+
+    @Resource
+    private TravelConversationMemory travelConversationMemory;
     
     /**
      * AI聊天接口
@@ -86,12 +92,12 @@ public class AIController {
             
             log.info("用户 {} 发起AI聊天请求: {}", loginUser.getId(), request.getMessage());
 
-            IntentType intent = IntentAwareChatEnhancer.resolveIntent(request);
-            IntentAwareChatEnhancer.applySystemPromptIfMissing(request, intent);
+            IntentType intent = intentAwareChatEnhancer.resolveIntent(request);
+            intentAwareChatEnhancer.applySystemPromptIfMissing(request, intent);
             
             // 调用AI服务
             AIResponse response = aiService.chat(request);
-            IntentAwareChatEnhancer.enrichResponseMetadata(response, intent);
+            intentAwareChatEnhancer.enrichResponseMetadata(response, intent);
             
             // 扣减配额
             if (response.getSuccess() && response.getTokensUsed() != null) {
@@ -190,7 +196,7 @@ public class AIController {
                 if (conversationId != null) {
                     try {
                         List<AIMessage> conversationMessages = messageService.getConversationMessages(conversationId);
-                        TravelConversationMemory.MemorySnapshot memorySnapshot = TravelConversationMemory.analyzeStatic(conversationMessages);
+                        TravelConversationMemory.MemorySnapshot memorySnapshot = travelConversationMemory.analyze(conversationMessages);
 
                         if (memorySnapshot.hasAnySignal()) {
                             String memoryBlock = memorySnapshot.toPromptBlock();

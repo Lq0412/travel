@@ -6,6 +6,7 @@ import com.lq.travel.service.AgentService;
 import com.lq.travel.service.TravelRagService;
 import com.lq.travel.service.impl.MilvusKnowledgeSyncService;
 import com.lq.travel.service.impl.TravelMultiAgentCoordinator;
+import com.lq.travel.util.IntentAnalyzer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -33,6 +34,9 @@ public class AIConfiguration implements CommandLineRunner {
 
     @Autowired
     private MilvusKnowledgeSyncService milvusKnowledgeSyncService;
+
+    @Autowired
+    private IntentAnalyzer intentAnalyzer;
     
     @Override
     public void run(String... args) throws Exception {
@@ -58,7 +62,8 @@ public class AIConfiguration implements CommandLineRunner {
                 "generic-travel",
                 aiService,
                 travelRagService,
-                travelMultiAgentCoordinator
+                travelMultiAgentCoordinator,
+                intentAnalyzer
         );
         agentService.registerAgent("generic-travel", genericTravelAgent);
         log.debug("通用旅行代理已注册: generic-travel");

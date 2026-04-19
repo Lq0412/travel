@@ -32,14 +32,17 @@ public class GenericTravelAgent extends BaseAgent {
     );
     private final TravelRagService travelRagService;
     private final TravelMultiAgentCoordinator multiAgentCoordinator;
+    private final IntentAnalyzer intentAnalyzer;
 
     public GenericTravelAgent(String name,
                               AIService aiService,
                               TravelRagService travelRagService,
-                              TravelMultiAgentCoordinator multiAgentCoordinator) {
+                              TravelMultiAgentCoordinator multiAgentCoordinator,
+                              IntentAnalyzer intentAnalyzer) {
         super(name, "通用旅行智能助手 - 提供多目的地旅行规划和咨询", aiService);
         this.travelRagService = travelRagService;
         this.multiAgentCoordinator = multiAgentCoordinator;
+        this.intentAnalyzer = intentAnalyzer;
     }
 
     @Override
@@ -159,8 +162,7 @@ public class GenericTravelAgent extends BaseAgent {
     }
 
     private IntentType resolveIntent(AgentRequest request) {
-        // TODO: Task 3 will inject IntentAnalyzer bean and use instance method
-        IntentType intent = new IntentAnalyzer(null).analyze(request.getTask());
+        IntentType intent = intentAnalyzer.analyze(request.getTask());
         if (intent != IntentType.GENERAL_CHAT) {
             return intent;
         }

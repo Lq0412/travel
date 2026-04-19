@@ -3,6 +3,7 @@ package com.lq.travel.util;
 import com.lq.travel.model.dto.ai.AIRequest;
 import com.lq.travel.model.dto.ai.AIResponse;
 import com.lq.travel.model.enums.IntentType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -12,14 +13,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IntentAwareChatEnhancerTest {
 
+    private IntentAwareChatEnhancer enhancer;
+
+    @BeforeEach
+    void setUp() {
+        // Use null AIService -> IntentAnalyzer falls back to regex-only analysis
+        IntentAnalyzer intentAnalyzer = new IntentAnalyzer(null);
+        enhancer = new IntentAwareChatEnhancer(intentAnalyzer);
+    }
+
     @Test
     void shouldApplyItineraryPromptWhenSystemPromptMissing() {
         AIRequest request = AIRequest.builder()
                 .message("帮我规划一份广州两日游行程")
                 .build();
 
-        IntentType intent = IntentAwareChatEnhancer.resolveIntent(request);
-        IntentAwareChatEnhancer.applySystemPromptIfMissing(request, intent);
+        IntentType intent = enhancer.resolveIntent(request);
+        enhancer.applySystemPromptIfMissing(request, intent);
 
         assertEquals(IntentType.ITINERARY_GENERATION, intent);
         assertNotNull(request.getSystemPrompt());
@@ -33,8 +43,8 @@ class IntentAwareChatEnhancerTest {
                 .systemPrompt("custom-system-prompt")
                 .build();
 
-        IntentType intent = IntentAwareChatEnhancer.resolveIntent(request);
-        IntentAwareChatEnhancer.applySystemPromptIfMissing(request, intent);
+        IntentType intent = enhancer.resolveIntent(request);
+        enhancer.applySystemPromptIfMissing(request, intent);
 
         assertEquals("custom-system-prompt", request.getSystemPrompt());
     }
@@ -67,7 +77,7 @@ class IntentAwareChatEnhancerTest {
                 """;
 
         AIResponse response = AIResponse.success(content, "model-x", "provider-x");
-        IntentAwareChatEnhancer.enrichResponseMetadata(response, IntentType.ITINERARY_GENERATION);
+        enhancer.enrichResponseMetadata(response, IntentType.ITINERARY_GENERATION);
 
         assertEquals("ITINERARY_GENERATION", response.getMetadata().get("intentType"));
         assertEquals(Boolean.TRUE, response.getMetadata().get("structuredItineraryAvailable"));
@@ -78,7 +88,7 @@ class IntentAwareChatEnhancerTest {
     void shouldMarkStructuredUnavailableWhenIntentIsAttractionQuery() {
         AIResponse response = AIResponse.success("广州从化有很多温泉景点", "model-x", "provider-x");
 
-        IntentAwareChatEnhancer.enrichResponseMetadata(response, IntentType.ATTRACTION_QUERY);
+        enhancer.enrichResponseMetadata(response, IntentType.ATTRACTION_QUERY);
 
         assertEquals("ATTRACTION_QUERY", response.getMetadata().get("intentType"));
         assertEquals(Boolean.FALSE, response.getMetadata().get("structuredItineraryAvailable"));

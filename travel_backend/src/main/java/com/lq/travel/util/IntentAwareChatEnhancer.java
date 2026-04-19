@@ -4,6 +4,7 @@ import com.lq.travel.model.dto.ai.AIRequest;
 import com.lq.travel.model.dto.ai.AIResponse;
 import com.lq.travel.model.enums.IntentType;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,20 +15,23 @@ import java.util.Optional;
  * 负责注入意图提示词并补充结构化元数据。
  */
 @Slf4j
-public final class IntentAwareChatEnhancer {
+@Component
+public class IntentAwareChatEnhancer {
 
-    private IntentAwareChatEnhancer() {
+    private final IntentAnalyzer intentAnalyzer;
+
+    public IntentAwareChatEnhancer(IntentAnalyzer intentAnalyzer) {
+        this.intentAnalyzer = intentAnalyzer;
     }
 
-    public static IntentType resolveIntent(AIRequest request) {
+    public IntentType resolveIntent(AIRequest request) {
         if (request == null) {
             return IntentType.GENERAL_CHAT;
         }
-        // TODO: Task 3 will inject IntentAnalyzer bean and use instance method
-        return new IntentAnalyzer(null).analyze(request.getMessage());
+        return intentAnalyzer.analyze(request.getMessage());
     }
 
-    public static void applySystemPromptIfMissing(AIRequest request, IntentType intent) {
+    public void applySystemPromptIfMissing(AIRequest request, IntentType intent) {
         if (request == null) {
             return;
         }
@@ -37,7 +41,7 @@ public final class IntentAwareChatEnhancer {
         request.setSystemPrompt(TravelIntentPromptFactory.byIntent(intent));
     }
 
-    public static void enrichResponseMetadata(AIResponse response, IntentType intent) {
+    public void enrichResponseMetadata(AIResponse response, IntentType intent) {
         if (response == null) {
             return;
         }
