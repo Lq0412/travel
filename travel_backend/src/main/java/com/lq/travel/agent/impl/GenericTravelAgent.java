@@ -159,7 +159,8 @@ public class GenericTravelAgent extends BaseAgent {
     }
 
     private IntentType resolveIntent(AgentRequest request) {
-        IntentType intent = IntentAnalyzer.analyze(request.getTask());
+        // TODO: Task 3 will inject IntentAnalyzer bean and use instance method
+        IntentType intent = new IntentAnalyzer(null).analyze(request.getTask());
         if (intent != IntentType.GENERAL_CHAT) {
             return intent;
         }

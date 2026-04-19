@@ -23,7 +23,8 @@ public final class IntentAwareChatEnhancer {
         if (request == null) {
             return IntentType.GENERAL_CHAT;
         }
-        return IntentAnalyzer.analyze(request.getMessage());
+        // TODO: Task 3 will inject IntentAnalyzer bean and use instance method
+        return new IntentAnalyzer(null).analyze(request.getMessage());
     }
 
     public static void applySystemPromptIfMissing(AIRequest request, IntentType intent) {
