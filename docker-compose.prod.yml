@@ -1,11 +1,9 @@
+# Production deployment - uses pre-built images from ACR
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
 services:
   frontend:
-    build:
-      context: ./travel_frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_AMAP_KEY: ${VITE_AMAP_KEY}
-        VITE_AMAP_SECURITY_CODE: ${VITE_AMAP_SECURITY_CODE}
+    image: ${DOCKER_REGISTRY:-crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com}/${DOCKER_NAMESPACE:-lq_travel}/frontend:${IMAGE_TAG:-latest}
     container_name: travel-frontend
     depends_on:
       backend:
@@ -17,9 +15,7 @@ services:
       - travel-network
 
   backend:
-    build:
-      context: ./travel_backend
-      dockerfile: Dockerfile
+    image: ${DOCKER_REGISTRY:-crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com}/${DOCKER_NAMESPACE:-lq_travel}/backend:${IMAGE_TAG:-latest}
     container_name: travel-backend
     depends_on:
       mysql:

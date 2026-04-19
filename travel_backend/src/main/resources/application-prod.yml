@@ -41,9 +41,9 @@ ai:
     tavily:
       api-key: ${AI_SEARCH_TAVILY_API_KEY:${TAVILY_API_KEY:}}
   rag:
-    enabled: true
+    enabled: ${AI_RAG_ENABLED:true}
     milvus:
-      enabled: true
+      enabled: ${AI_RAG_MILVUS_ENABLED:false}
       endpoint: ${MILVUS_ENDPOINT:http://milvus:19530}
       token: ${MILVUS_TOKEN:}
       database: ${MILVUS_DATABASE:default}

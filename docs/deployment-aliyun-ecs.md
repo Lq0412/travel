@@ -1,31 +1,26 @@
-# 阿里云 ECS 部署说明
+# 阿里云 ECS 部署指南
 
-本文档对应当前仓库的生产部署方案：
+## 架构概览
 
 - 服务器：阿里云 ECS Ubuntu 22.04
-- 访问方式：公网 IP 直连
-- 编排方式：Docker Compose
-- 首版服务：`frontend`、`backend`、`mysql`、`redis`、`rabbitmq`、`milvus`
+- 编排：Docker Compose
+- 镜像仓库：阿里云容器镜像服务 ACR（个人版，免费）
+- 服务：frontend、backend、mysql、redis、rabbitmq、milvus + etcd + minio
 
 ## 1. 服务器前置要求
 
-阿里云安全组至少放行以下端口：
+- 最低配置：2C4G（Milvus 吃内存，建议 4G 以上）
+- 系统：Ubuntu 22.04
 
+安全组放行：
 - `22`：SSH
 - `80`：前端站点
+- `443`：HTTPS（绑定域名后）
 
-首版不建议对公网开放以下端口：
+以下端口**不要**对公网开放，容器内网通信即可：
+- 3306（MySQL）、6379（Redis）、5672（RabbitMQ）、19530（Milvus）
 
-- `3306`
-- `6379`
-- `5672`
-- `15672`
-- `19530`
-- `9091`
-
-这些端口通过容器内部网络访问即可。
-
-## 2. 安装 Docker 和 Compose
+## 2. 安装 Docker
 
 ```bash
 sudo apt update
@@ -43,114 +38,103 @@ sudo systemctl enable docker
 sudo systemctl start docker
 ```
 
-## 3. 上传项目
+## 3. ACR 镜像仓库信息
+
+- 区域：华南3（广州）
+- 命名空间：`lq_travel`
+- 用户名：`nick1539634772`
+- 仓库地址：
+
+| 仓库 | 公网地址 |
+|------|----------|
+| backend | `crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com/lq_travel/backend` |
+| frontend | `crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com/lq_travel/frontend` |
+
+ECS 内网推送（免流量）：`crpi-4dquy2tjlozfjo6n-vpc.cn-guangzhou.personal.cr.aliyuncs.com`
+
+## 4. 本地构建并推送镜像
 
 ```bash
-git clone <你的仓库地址>
+# 登录 ACR
+docker login --username=nick1539634772 crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com
+
+# 构建镜像（本地执行）
+docker compose build
+
+# 打标签并推送
+docker tag travel-backend crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com/lq_travel/backend:latest
+docker tag travel-frontend crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com/lq_travel/frontend:latest
+docker push crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com/lq_travel/backend:latest
+docker push crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com/lq_travel/frontend:latest
+```
+
+后续更新代码后，重复 build → tag → push 即可。
+
+## 5. 服务器部署
+
+```bash
+# 克隆仓库
+git clone https://github.com/Lq0412/travel.git
 cd travel
+
+# 创建环境变量文件
 cp .env.example .env
+nano .env  # 填写生产环境的密码和 API Key
+
+# 登录 ACR（服务器也需要登录才能拉私有镜像）
+docker login --username=nick1539634772 crpi-4dquy2tjlozfjo6n.cn-guangzhou.personal.cr.aliyuncs.com
+
+# 拉取镜像并启动
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-## 4. 填写服务器环境变量
+## 6. 数据初始化
 
-编辑根目录 `.env`：
+首次部署时，MySQL 会自动执行 `travel.sql` 建表。
+
+如果有备份数据需要导入：
 
 ```bash
-nano .env
+docker exec -i travel-mysql mysql -uroot -p你的密码 < travel-data-backup.sql
 ```
-
-至少需要填写这些值：
-
-- `MYSQL_ROOT_PASSWORD`
-- `MYSQL_PASSWORD`
-- `REDIS_PASSWORD`
-- `RABBITMQ_DEFAULT_PASS`
-- `MINIO_ROOT_PASSWORD`
-- `DASHSCOPE_API_KEY`
-- `TAVILY_API_KEY`
-- `AMAP_KEY`
-- `VITE_AMAP_KEY`
-- `VITE_AMAP_SECURITY_CODE`
-- `PEXELS_API_KEY`
-- `COS_CLIENT_HOST`
-- `COS_CLIENT_REGION`
-- `COS_CLIENT_BUCKET`
-- `COS_CLIENT_SECRETID`
-- `COS_CLIENT_SECRETKEY`
-
-说明：
-
-- MySQL 首次启动时会自动导入 [travel.sql](C:/Users/Lq304/Desktop/travel/travel_backend/src/main/resources/sql/travel.sql)
-- 只有在 `mysql-data` 卷为空时才会执行初始化 SQL
-
-## 5. 启动服务
-
-在仓库根目录执行：
-
-```bash
-docker compose up -d --build
-```
-
-查看启动状态：
-
-```bash
-docker compose ps
-docker compose logs -f backend
-```
-
-## 6. 访问地址
-
-首版使用公网 IP 访问：
-
-- 前端首页：`http://8.163.101.247`
-
-如果后续绑定域名，再补：
-
-- HTTPS
-- `443` 监听
-- Nginx 证书配置
 
 ## 7. 常用运维命令
 
-重建前后端镜像：
-
 ```bash
-docker compose up -d --build frontend backend
+# 查看所有服务状态
+docker compose -f docker-compose.prod.yml ps
+
+# 查看后端日志
+docker compose -f docker-compose.prod.yml logs -f backend
+
+# 更新部署（本地 push 新镜像后）
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+
+# 重建单个服务
+docker compose -f docker-compose.prod.yml up -d --force-recreate backend
+
+# 停止所有服务
+docker compose -f docker-compose.prod.yml down
+
+# 停止并清除数据卷（慎用，会丢失数据库数据）
+docker compose -f docker-compose.prod.yml down -v
 ```
 
-查看日志：
+## 8. 文件说明
 
-```bash
-docker compose logs -f frontend
-docker compose logs -f backend
-docker compose logs -f mysql
-docker compose logs -f redis
-docker compose logs -f rabbitmq
-docker compose logs -f milvus
-```
+| 文件 | 用途 |
+|------|------|
+| `docker-compose.yml` | 本地开发，从源码 build |
+| `docker-compose.prod.yml` | 生产部署，从 ACR 拉取镜像 |
+| `.env.example` | 环境变量模板 |
+| `.env` | 实际环境变量（不提交 Git） |
+| `travel-data-backup.sql` | 数据库备份 |
 
-停止服务：
+## 9. 注意事项
 
-```bash
-docker compose down
-```
-
-保留容器卷情况下重启：
-
-```bash
-docker compose down
-docker compose up -d
-```
-
-## 8. 首版上线建议
-
-- 先确认 `backend` 能连通 `mysql`、`redis`、`rabbitmq`、`milvus`
-- 再在浏览器访问 `http://8.163.101.247`
-- 如果 AI 工作台流式接口异常，优先检查 `backend` 日志和 DashScope Key
-- 如果 Milvus 相关页面异常，先确认 `milvus`、`etcd`、`minio` 三个容器都已启动
-
-## 9. 后续建议
-
-- 绑定域名后再加 HTTPS
-- 把仓库里已经出现过的真实密钥统一轮换
-- 如果 ECS 内存偏小，可以考虑第二阶段再把 `milvus` 独立出去
+- `.env` 包含密码和 API Key，不要提交到 Git（已在 .gitignore 中）
+- 生产环境密码请重新生成，不要使用开发环境的密码
+- 服务器内存不足时，Milvus 可能启动失败，可用 `AI_RAG_MILVUS_ENABLED=false` 关闭
+- 后续绑域名加 HTTPS，可用 Caddy 或 Nginx + Let's Encrypt
