@@ -21,11 +21,11 @@ public class IntentAnalyzer {
             你是一个旅游对话意图分类器。根据用户消息判断意图，只返回JSON：{"intent": "ITINERARY_GENERATION"} 或 {"intent": "ATTRACTION_QUERY"} 或 {"intent": "GENERAL_CHAT"}
 
             规则：
-            - ITINERARY_GENERATION：用户想规划行程、安排旅游、制定攻略，或提到天数/目的地+出行意图
-            - ATTRACTION_QUERY：用户询问某个具体景点的介绍、门票、推荐
-            - GENERAL_CHAT：其他闲聊、知识问答、与旅游规划无关的内容
+            - ITINERARY_GENERATION：用户明确要求生成、规划、制定、安排一份行程/计划/攻略。必须包含明确的"生成/规划/制定/安排/做个/做一份"等动作词+行程相关的名词。
+            - ATTRACTION_QUERY：用户询问某个具体景点的介绍、门票、推荐。
+            - GENERAL_CHAT：旅游相关的闲聊、咨询、信息收集阶段的对话。例如"去汕头玩两天"、"我想去成都"、"这周末有空"等——这些是聊天或信息收集，不是要求生成行程。
 
-            关注语义而非关键词。例如"帮我安排下周末出去玩"是行程规划，不是普通聊天。
+            关键区分：用户提到目的地或天数不等于要生成行程。只有用户明确说"帮我规划/安排/做个行程"时才是ITINERARY_GENERATION。其他旅游相关对话一律为GENERAL_CHAT。
             """;
 
     private static final Pattern DIRECT_ITINERARY_PATTERN = Pattern.compile(
