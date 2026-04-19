@@ -32,9 +32,11 @@ public class TravelConversationMemory {
             {"destination":"目的地","travelDate":"出行时间","days":"天数","budget":"预算","accommodation":"住宿偏好","transport":"交通方式","companions":"同行人","isReadyForItinerary":true或false}
 
             规则：
-            - 只提取用户明确说出的信息，不猜测。未确认的字段值为空字符串。
-            - isReadyForItinerary为true需要满足：目的地、出行时间、天数已确认。
-            - 住宿偏好和交通方式缺失不影响isReadyForItinerary。
+            - 只从user角色的消息中提取信息，忽略assistant角色的消息和系统提供的上下文信息。
+            - 只提取用户自己明确说出的个人旅行计划，不提取推荐、咨询、美食等话题中提到的地名。
+            - 例如"请推荐成都美食"不算用户要去成都，isReadyForItinerary应为false。
+            - 未确认的字段值为空字符串。
+            - isReadyForItinerary为true需要满足：用户明确表达了要出行，且目的地、出行时间、天数已确认。
             - 只返回JSON，不要其他内容。
             """;
 
