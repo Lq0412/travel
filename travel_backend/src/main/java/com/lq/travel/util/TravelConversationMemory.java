@@ -82,14 +82,6 @@ public class TravelConversationMemory {
         return extractViaRegex(messages);
     }
 
-    /**
-     * Static compatibility shim for callers not yet migrated to the Spring bean.
-     * Delegates to regex-only extraction (no LLM).
-     */
-    public static MemorySnapshot analyzeStatic(List<AIMessage> messages) {
-        return extractViaRegex(messages);
-    }
-
     private MemorySnapshot extractViaLLM(List<AIMessage> messages) {
         String conversationText = buildConversationText(messages);
         if (!StringUtils.hasText(conversationText)) {
